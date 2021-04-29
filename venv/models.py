@@ -25,7 +25,7 @@ def models(user_input):
         for num, d in enumerate(docs.sents):
             # print(d.start)
             for token in d:
-                print(token.text, token.head, token.lemma_, token.pos_, token.tag_, token.dep_,
+                print(token.text, token.head, token.norm_, token.pos_, token.tag_, token.dep_,
                       token.i + d.start, token.is_oov)  # token.sent, token.is_alpha, token.is_stop , token.nbor()
 
             # Найти фразу, потом если глагол к ней в present perfect - ошибка
@@ -35,12 +35,12 @@ def models(user_input):
             # Паттерн 1 - поиск фразы ((in\s|over\s|from\s|between\s)(the\s)?(year|years)?\d*)
             # If exists VBN
             # Добавить during?
-            patt_one = [i for i in d if i.lemma_ in {'from', 'in', 'over', 'between'}]
+            patt_one = [i for i in d if i.norm_ in {'from', 'in', 'over', 'between'}]
             # нашли предлоги - дальше найти связи к the year/years - связь: pobj
             patt_one = [i.head for i in patt_one if ([j for j in i.children if
-                                                      j.dep_ == 'pobj' and j.lemma_ == 'year' and not [rec for rec in
+                                                      j.dep_ == 'pobj' and j.norm_ == 'year' and not [rec for rec in
                                                                                                        j.children if
-                                                                                                       rec.lemma_ in {
+                                                                                                       rec.norm_ in {
                                                                                                            'recent',
                                                                                                            'last'}]] \
                                                      or [j for j in i.children if j.tag_ == 'CD'])]
@@ -60,50 +60,50 @@ def models(user_input):
                        'autumn', 'winter', 'summer', 'night',
                        'evening', 'morning', 'season', 'stage', 'point', 'phase'
                        }
-            patt_two = [i for i in d if i.lemma_ in {'at', 'in', 'over'}]
+            patt_two = [i for i in d if i.norm_ in {'at', 'in', 'over'}]
             patt_two = [i for i in patt_two if [j for j in i.children \
                                                 if j.dep_ in {'pobj', 'npadvmod'} and j.tag_ == 'NN' and \
                                                 [k for k in j.children if
                                                  k.ent_type_ == 'ORDINAL' or \
-                                                 k.lemma_ in {'last', 'initial'}]]]
+                                                 k.norm_ in {'last', 'initial'}]]]
             patt_two = [i.head for i in patt_two if i.head.tag_ == 'VBN']
 
-            patt_three = [i for i in d if i.lemma_ in {'ago'}]
+            patt_three = [i for i in d if i.norm_ in {'ago'}]
             patt_three = [i.head for i in patt_three if i.head.tag_ == 'VBN' and not [k for k in \
                                                                                       i.head.children \
-                                                                                      if k.lemma_ == 'since']]
+                                                                                      if k.norm_ == 'since']]
 
             patt_four = [i for i in d if
                          i.tag_ == 'VBN' and [j for j in i.children if j in periods \
                                               and j.dep_ in {'pobj', 'npadvmod'} and j.tag_ == 'NN'
-                                              and [k for k in j.children if k.lemma_ == 'last']]]
+                                              and [k for k in j.children if k.norm_ == 'last']]]
 
-            patt_five = [i.head for i in d if i.lemma_ in {'from', 'since'} and \
+            patt_five = [i.head for i in d if i.norm_ in {'from', 'since'} and \
                          i.dep_ == 'prep' and [j for j in i.children if j.tag_ == 'CD' and \
                                                not [k for k in j.children if k.dep_ == 'nmod']]]
-            patt_five = [i for i in patt_five if [n for n in i.children if n.lemma_ == 'to' and \
+            patt_five = [i for i in patt_five if [n for n in i.children if n.norm_ == 'to' and \
                                                   n.dep_ == 'prep' and [j for j in n.children if j.tag_ == 'CD' and \
                                                                         not [k for k in j.children if
                                                                              k.dep_ == 'nmod']]]]
             patt_five = [i for i in patt_five if i.head.tag_ == 'VBN']
 
-            patt_six = [i for i in d if i.lemma_ == 'yesterday']
-            patt_seven = [i for i in d if i.lemma_ == 'day' \
-                          and [j for j in i.children if j.lemma_ == 'before' and \
-                               [k for k in j.children if k.lemma_ == 'yesterday']]]
+            patt_six = [i for i in d if i.norm_ == 'yesterday']
+            patt_seven = [i for i in d if i.norm_ == 'day' \
+                          and [j for j in i.children if j.norm_ == 'before' and \
+                               [k for k in j.children if k.norm_ == 'yesterday']]]
             patt_six = [i.head for i in patt_six if i.head.tag_ == 'VBN']
             patt_seven = [i.head for i in patt_seven if i.head.tag_ == 'VBN']
 
             basic_last = [i for i in d if i.tag_ == 'VBN' \
                           and [j for j in i.children if j.pos_ == 'NOUN' and j.head.dep_ != 'prep' and \
-                               [k for k in j.children if k.lemma_ == 'last']
+                               [k for k in j.children if k.norm_ == 'last']
                                ]]
             all_patterns = [patt_one, patt_two, patt_three, \
                             patt_four, patt_five, patt_six, patt_seven, basic_last]
             errs = set()
             for pattern in all_patterns:
                 for p in pattern:
-                    flag_word = [w for w in p.children if w.lemma_ == 'have' and w.dep_ == 'aux']
+                    flag_word = [w for w in p.children if w.norm_ == 'have' and w.dep_ == 'aux']
                     if flag_word:
                         flag_word = flag_word[0]
                         if not {flag_word.i - d.start}.intersection(errs):
@@ -117,28 +117,28 @@ def models(user_input):
         def find_wrong_order(token_i):
             possible_inversions = {'barely', 'never', 'rarely', 'hardly', 'seldom',
                                    'scarcely'}
-            if token_i.lemma_ in possible_inversions:
+            if token_i.norm_ in possible_inversions:
                 return True
-            elif token_i.lemma_ == 'under':
-                flag = [i for i in token_i.children if i.lemma_ == 'circumstances']
+            elif token_i.norm_ == 'under':
+                flag = [i for i in token_i.children if i.norm_ == 'circumstances']
                 if flag:
-                    if {i for i in token_i.children if i.lemma_ == 'no'}:
+                    if {i for i in token_i.children if i.norm_ == 'no'}:
                         return True
-            elif token_i.lemma_ == 'no':
-                flag = [i for i in token_i.children if i.lemma_ == 'sooner']
+            elif token_i.norm_ == 'no':
+                flag = [i for i in token_i.children if i.norm_ == 'sooner']
                 if flag:
                     return True
-            elif token_i.lemma_ == 'not':
-                flag = [i for i in token_i.children if i.lemma_ in {'only', 'until'}]
+            elif token_i.norm_ == 'not':
+                flag = [i for i in token_i.children if i.norm_ in {'only', 'until'}]
                 if flag:
                     return True
-            elif token_i.lemma_ == 'at':
-                flag = [i for i in token_i.children if i.lemma_ in {'no'}]
-                if {i for i in token_i.children if i.lemma_ in {'time', 'point'}}:
+            elif token_i.norm_ == 'at':
+                flag = [i for i in token_i.children if i.norm_ in {'no'}]
+                if {i for i in token_i.children if i.norm_ in {'time', 'point'}}:
                     return True
 
-            elif token_i.lemma_ == 'little' and token_i.dep_ in {'npadvmod', 'dobj'}:
-                if not [i for i in token_i.children if i.lemma_ in {'by'}]:
+            elif token_i.norm_ == 'little' and token_i.dep_ in {'npadvmod', 'dobj'}:
+                if not [i for i in token_i.children if i.norm_ in {'by'}]:
                     return True
 
             return False
@@ -181,7 +181,7 @@ def models(user_input):
                     wrb = [i for i in ccomp_verb[0].children if i.tag_ == 'WRB' and i.dep_ == 'advmod']
                     if not wrb:
                         whether = [i for i in ccomp_verb[0].children if i.pos_ == 'SCONJ' \
-                                   and i.dep_ == 'mark' and i.lemma_ in {'if', 'whether'}]
+                                   and i.dep_ == 'mark' and i.norm_ in {'if', 'whether'}]
                         if whether:
                             wrb = whether
 
@@ -231,7 +231,7 @@ def models(user_input):
 
                         if t.ent_type_ in {'ORG', 'GPE', 'GPE', \
                                            'LANGUAGE', 'DATE', 'PERSON', 'EVENT'} and \
-                                str(t.lemma_).lower() not in misspelled_words:
+                                str(t.norm_).lower() not in misspelled_words:
                             errors.add(t.i)
 
         return errors
@@ -242,7 +242,7 @@ def models(user_input):
             length = d.end - d.start
             possible_errs = []
             for token in d:
-                if (str(token.pos_) == 'NOUN' or (len(str(token.text)) in {2, 3, 4})) and token.lemma_ not in {'my',
+                if (str(token.pos_) == 'NOUN' or (len(str(token.text)) in {2, 3, 4})) and token.norm_ not in {'my',
                                                                                                                'nail',
                                                                                                                'kid'}:
 
@@ -253,7 +253,7 @@ def models(user_input):
                     string += ttt
                 else:
                     if str(token.pos_) == 'PRON' and \
-                            token.lemma_ == 'I' and not token.is_title:
+                            token.norm_ == 'I' and not token.is_title:
                         errors.append([num, [token.i - d.start], 'You should capitilize that word.'])
                     elif str(token.pos_) == 'NNP' and not token.is_title:
                         errors.append([num, [token.i - d.start], 'You should capitilize that word.'])
@@ -359,19 +359,3 @@ def models(user_input):
 
 # print(models('She works in microsoft. She works on monday. She was born in April.'))
 print(models('I wonder whether he did it or not.'))
-# I have been there in 1994. I have been there from 1984. I have been there during 2056. I have been there in the year 2000.
-# I have been there between the years and year 2000s.
-# I have done it during the first period.
-# I have made it in the last decade.
-# I have really been there in the awful 1991s.
-# I have been there during the First World War.
-# I have not been there long ago.
-# I have been there in 1997.
-# I have been there since 1998. - corr
-# I have been there since 1996 to 2000.
-# ((at|in|during)\s(the\s)?(first|second|third|fourth|fifth|initial|last)\\
-# \s(stage|point|phase|period|year|decade|century))
-# r'((long)?ago)'
-# r'(last\s(year|term|summer|century)*)'
-# r'((since)\s\d{4}\sto\s\d{4})'
-# r'((the\sday\sbefore\s)*(yesterday))'
