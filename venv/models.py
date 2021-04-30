@@ -342,6 +342,8 @@ def models(user_input):
                             to_replace = [str(words[i]) for i in sorted(element[0])]
                             # print('REPLACED', to_replace)
                             to_replace = ' '.join(to_replace)
+                            if ' n\'t' in to_replace:
+                                to_replace = to_replace.replace(' n\'t', 'n\'t')
                             sentence_no_err[k] = [to_replace, *element[1:]]
                     # print(sentence_no_err)
                     result[error[0]] = sentence_no_err
