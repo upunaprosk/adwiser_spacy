@@ -365,5 +365,4 @@ def models(user_input):
     return output
 
 
-# print(models('She works in microsoft. She works on monday. She was born in April.'))
 print(models('I wonder whether he did it or not.'))
