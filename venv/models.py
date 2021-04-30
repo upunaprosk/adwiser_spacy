@@ -108,7 +108,12 @@ def models(user_input):
                         flag_word = flag_word[0]
                         if not {flag_word.i - d.start}.intersection(errs):
                             errs = errs | {flag_word.i - d.start}
-                            errors.append([num, [flag_word.i - d.start], error_message])
+                            not_ = [i for i in p.children if i.dep_ == 'neg' and i.norm_ == 'not']
+                            span = [flag_word.i - d.start]
+                            if not_:
+                                span.append(not_[0].i - d.start)
+
+                            errors.append([num, span, error_message])
         return errors
 
     def inversion(docs, errors):
