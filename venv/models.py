@@ -1,11 +1,9 @@
 import re
 import spacy
 from autocorrect import Speller
-
 nlp = spacy.load("en_core_web_sm")
-
-
 def models(user_input):
+
     def preprocessing(text):
 
         text = re.sub(r'\n+', '\n', text)
@@ -18,15 +16,16 @@ def models(user_input):
         text = re.sub(r'[^\s]\(', ' (', text)
 
         return text
-
     def pp_time(docs, errors):
 
         error_message = 'Present Perfect does not go along with indication of past tense.'
         for num, d in enumerate(docs.sents):
-            # print(d.start)
+            #print(d.start)
             for token in d:
-                print(token.text, token.head, token.norm_, token.pos_, token.tag_, token.dep_,
+                print(token.text, token.head, token.lemma_, token.pos_, token.tag_, token.dep_,
                       token.i + d.start, token.is_oov)  # token.sent, token.is_alpha, token.is_stop , token.nbor()
+
+
 
             # Найти фразу, потом если глагол к ней в present perfect - ошибка
 
@@ -35,80 +34,74 @@ def models(user_input):
             # Паттерн 1 - поиск фразы ((in\s|over\s|from\s|between\s)(the\s)?(year|years)?\d*)
             # If exists VBN
             # Добавить during?
-            patt_one = [i for i in d if i.norm_ in {'from', 'in', 'over', 'between'}]
+            patt_one = [i for i in d if i.lemma_ in {'from', 'in', 'over', 'between'}]
             # нашли предлоги - дальше найти связи к the year/years - связь: pobj
-            patt_one = [i.head for i in patt_one if ([j for j in i.children if
-                                                      j.dep_ == 'pobj' and j.norm_ == 'year' and not [rec for rec in
-                                                                                                       j.children if
-                                                                                                       rec.norm_ in {
-                                                                                                           'recent',
-                                                                                                           'last'}]] \
-                                                     or [j for j in i.children if j.tag_ == 'CD'])]
+            patt_one = [i.head for i in patt_one if ([j for j in i.children if j.dep_ == 'pobj' and j.lemma_=='year' and not [rec for rec in j.children if rec.lemma_ in {'recent', 'last'} ]]\
+                        or [j for j in i.children if j.tag_ == 'CD'])]
 
             patt_one = [i for i in patt_one if
                         i.tag_ == 'VBN']
 
             # have smth done prep year or (i.head.tag_ =='VBN' and i.head.head.tag_ =='VBD')
-            # print('PATTERN, 1', patt_one, d)
+            #print('PATTERN, 1', patt_one, d)
             # Паттерн 2 - поиск фразы
             # ((at|in|during)\s(the\s)?(first|second|third|fourth|fifth|initial|last)\\
             # \s(stage|point|phase|period|year|decade|century))
 
             #
-            periods = {'year', 'term', 'week', 'semester', 'century' \
-                                                           'day', 'month', 'decade', 'spring', 'fall',
+            periods = {'year', 'term', 'week', 'semester', 'century'\
+                      'day', 'month', 'decade','spring', 'fall',
                        'autumn', 'winter', 'summer', 'night',
-                       'evening', 'morning', 'season', 'stage', 'point', 'phase'
-                       }
-            patt_two = [i for i in d if i.norm_ in {'at', 'in', 'over'}]
+                       'evening', 'morning', 'season', 'stage', 'point','phase'
+                      }
+            patt_two = [i for i in d if i.lemma_ in {'at', 'in', 'over'}]
             patt_two = [i for i in patt_two if [j for j in i.children \
-                                                if j.dep_ in {'pobj', 'npadvmod'} and j.tag_ == 'NN' and \
+                                                if j.dep_ in {'pobj', 'npadvmod'} and j.tag_ =='NN' and \
                                                 [k for k in j.children if
                                                  k.ent_type_ == 'ORDINAL' or \
-                                                 k.norm_ in {'last', 'initial'}]]]
+                                                 k.lemma_ in {'last', 'initial'}]]]
             patt_two = [i.head for i in patt_two if i.head.tag_ == 'VBN']
 
-            patt_three = [i for i in d if i.norm_ in {'ago'}]
+            patt_three = [i for i in d if i.lemma_ in {'ago'}]
             patt_three = [i.head for i in patt_three if i.head.tag_ == 'VBN' and not [k for k in \
                                                                                       i.head.children \
-                                                                                      if k.norm_ == 'since']]
+                                                                                      if k.lemma_ == 'since']]
 
             patt_four = [i for i in d if
-                         i.tag_ == 'VBN' and [j for j in i.children if j in periods \
+                         i.tag_ == 'VBN' and [j for j in i.children if j in periods  \
                                               and j.dep_ in {'pobj', 'npadvmod'} and j.tag_ == 'NN'
-                                              and [k for k in j.children if k.norm_ == 'last']]]
+                                              and [k for k in j.children if k.lemma_ == 'last']]]
 
-            patt_five = [i.head for i in d if i.norm_ in {'from', 'since'} and \
+            patt_five = [i.head for i in d if i.lemma_ in {'from', 'since'} and \
                          i.dep_ == 'prep' and [j for j in i.children if j.tag_ == 'CD' and \
                                                not [k for k in j.children if k.dep_ == 'nmod']]]
-            patt_five = [i for i in patt_five if [n for n in i.children if n.norm_ == 'to' and \
-                                                  n.dep_ == 'prep' and [j for j in n.children if j.tag_ == 'CD' and \
-                                                                        not [k for k in j.children if
-                                                                             k.dep_ == 'nmod']]]]
+            patt_five = [i for i in patt_five if [n for n in i.children if n.lemma_ == 'to' and \
+                         n.dep_ == 'prep' and [j for j in n.children if j.tag_ == 'CD' and \
+                                               not [k for k in j.children if k.dep_ == 'nmod']]]]
             patt_five = [i for i in patt_five if i.head.tag_ == 'VBN']
 
-            patt_six = [i for i in d if i.norm_ == 'yesterday']
-            patt_seven = [i for i in d if i.norm_ == 'day' \
-                          and [j for j in i.children if j.norm_ == 'before' and \
-                               [k for k in j.children if k.norm_ == 'yesterday']]]
+            patt_six = [i for i in d if i.lemma_ == 'yesterday']
+            patt_seven = [i for i in d if i.lemma_ == 'day' \
+                          and [j for j in i.children if j.lemma_ == 'before' and \
+                               [k for k in j.children if k.lemma_ == 'yesterday']]]
             patt_six = [i.head for i in patt_six if i.head.tag_ == 'VBN']
             patt_seven = [i.head for i in patt_seven if i.head.tag_ == 'VBN']
 
             basic_last = [i for i in d if i.tag_ == 'VBN' \
-                          and [j for j in i.children if j.pos_ == 'NOUN' and j.head.dep_ != 'prep' and \
-                               [k for k in j.children if k.norm_ == 'last']
+                          and [j for j in i.children if j. pos_ == 'NOUN' and j.head.dep_ != 'prep' and \
+                               [k for k in j.children if k.lemma_ == 'last']
                                ]]
-            all_patterns = [patt_one, patt_two, patt_three, \
-                            patt_four, patt_five, patt_six, patt_seven, basic_last]
+            all_patterns = [patt_one, patt_two, patt_three,\
+                            patt_four, patt_five, patt_six, patt_seven,basic_last]
             errs = set()
             for pattern in all_patterns:
                 for p in pattern:
-                    flag_word = [w for w in p.children if w.norm_ == 'have' and w.dep_ == 'aux']
+                    flag_word = [w for w in p.children if w.lemma_ == 'have' and w.dep_ == 'aux']
                     if flag_word:
                         flag_word = flag_word[0]
-                        if not {flag_word.i - d.start}.intersection(errs):
-                            errs = errs | {flag_word.i - d.start}
-                            not_ = [i for i in p.children if i.dep_ == 'neg' and i.norm_ == 'not']
+                        if not {flag_word.i-d.start}.intersection(errs):
+                            errs = errs|{flag_word.i-d.start}
+                            not_ = [i for i in p.children if i.dep_ == 'neg' and i.norm_=='not']
                             span = [flag_word.i - d.start]
                             if not_:
                                 span.append(not_[0].i - d.start)
@@ -118,36 +111,34 @@ def models(user_input):
 
     def inversion(docs, errors):
         error_message = 'This might be an erroneous use of inversion.'
-
         def find_wrong_order(token_i):
             possible_inversions = {'barely', 'never', 'rarely', 'hardly', 'seldom',
                                    'scarcely'}
-            if token_i.norm_ in possible_inversions:
+            if token_i.lemma_ in possible_inversions:
                 return True
-            elif token_i.norm_ == 'under':
-                flag = [i for i in token_i.children if i.norm_ == 'circumstances']
+            elif token_i.lemma_ == 'under':
+                flag = [i for i in token_i.children if i.lemma_ == 'circumstances']
                 if flag:
-                    if {i for i in token_i.children if i.norm_ == 'no'}:
+                    if {i for i in token_i.children if i.lemma_ == 'no'}:
                         return True
-            elif token_i.norm_ == 'no':
-                flag = [i for i in token_i.children if i.norm_ == 'sooner']
+            elif token_i.lemma_ == 'no':
+                flag = [i for i in token_i.children if i.lemma_ == 'sooner']
                 if flag:
                     return True
-            elif token_i.norm_ == 'not':
-                flag = [i for i in token_i.children if i.norm_ in {'only', 'until'}]
+            elif token_i.lemma_ == 'not':
+                flag = [i for i in token_i.children if i.lemma_ in {'only', 'until'}]
                 if flag:
                     return True
-            elif token_i.norm_ == 'at':
-                flag = [i for i in token_i.children if i.norm_ in {'no'}]
-                if {i for i in token_i.children if i.norm_ in {'time', 'point'}}:
-                    return True
+            elif token_i.lemma_ == 'at':
+                flag = [i for i in token_i.children if i.lemma_ in {'no'}]
+                if {i for i in token_i.children if i.lemma_ in {'time', 'point'}}:
+                        return True
 
-            elif token_i.norm_ == 'little' and token_i.dep_ in {'npadvmod', 'dobj'}:
-                if not [i for i in token_i.children if i.norm_ in {'by'}]:
-                    return True
+            elif token_i.lemma_ == 'little' and token_i.dep_ in {'npadvmod' ,'dobj'}:
+                if not [i for i in token_i.children if i.lemma_ in {'by'}]:
+                        return True
 
             return False
-
         for num, d in enumerate(docs.sents):
 
             for token in d:
@@ -156,19 +147,20 @@ def models(user_input):
                         verb = token.head if token.head.pos_ == 'AUX' else ''
                         wrong_order = False
                         if not verb:
-                            aux = [v for v in token.head.children if v.pos_ == 'AUX']
+                            aux = [v for v in token.head.children if v.pos_=='AUX']
                             verb_ = token.head if token.head.pos_ == 'VERB' else ''
                             if aux:
                                 verb = aux[0]
                             elif verb_:
                                 verb = verb_
                         if verb:
-                            noun = [noun for noun in token.head.children if noun.dep_ == 'nsubj']
+                            noun = [noun for noun in token.head.children if noun.dep_ =='nsubj']
                             wrong_order = False
                             if noun:
                                 wrong_order = True if verb.i > noun[0].i else False
                                 if wrong_order:
-                                    errors.append([num, [verb.i - d.start], error_message])
+
+                                    errors.append([num,[verb.i-d.start], error_message])
 
         return errors
 
@@ -180,28 +172,28 @@ def models(user_input):
             if not cite:
                 ccomp_verb = [i for i in verb.children if i.dep_ == 'ccomp' \
                               and i.pos_ == 'VERB']
-                wrb = ''
+                wrb =''
                 if ccomp_verb:
 
-                    wrb = [i for i in ccomp_verb[0].children if i.tag_ == 'WRB' and i.dep_ == 'advmod']
+                    wrb = [i for i in ccomp_verb[0].children if i.tag_ == 'WRB' and  i.dep_ == 'advmod']
                     if not wrb:
                         whether = [i for i in ccomp_verb[0].children if i.pos_ == 'SCONJ' \
-                                   and i.dep_ == 'mark' and i.norm_ in {'if', 'whether'}]
+                           and  i.dep_ == 'mark' and i.lemma_ in {'if', 'whether'}]
                         if whether:
                             wrb = whether
 
                     if wrb:
                         aux = [i for i in ccomp_verb[0].children if i.dep_ == 'aux' \
-                               and i.pos_ == 'AUX']
-                        noun = [i for i in ccomp_verb[0].children if i.dep_ == 'nsubj']
+                              and i.pos_ == 'AUX']
+                        noun = [i for i in ccomp_verb[0].children if i.dep_ == 'nsubj' ]
                         if not aux:
                             aux = ccomp_verb
                         if noun and aux:
                             if aux[0].i < noun[0].i:
-                                words = range(aux[0].i, noun[0].i + 1)
+
+                                words = range(aux[0].i, noun[0].i+1)
                                 errors.append([num, [*words], error_message])
                 return errors
-
     def make_extended_out(data):
 
         res = []
@@ -209,19 +201,15 @@ def models(user_input):
             res.extend(sent)
 
         return res
-
     misspelled_words = set()
-
     def spelling(docs, errors):
         spell = Speller(lang='en')
         for num, d in enumerate(docs.sents):
             for token in d:
                 if str(spell(str(token.text))) != str(token.text):
                     misspelled_words.add(str(token.text).lower())
-                    errors.append([num, [token.i],
-                                   f'You might have misspelled that word, possible correction: {str(spell(str(token.text)))}'])
-        return errors
-
+                    errors.append([num, [token.i], f'You might have misspelled that word, possible correction: {str(spell(str(token.text)))}'])
+        return  errors
     def capitilise_error(sentence, nums):
         if not nums:
             return []
@@ -235,10 +223,10 @@ def models(user_input):
                     if t.pos_ in {'PROPN'}:
 
                         if t.ent_type_ in {'GPE', \
-                                           'LANGUAGE', 'DATE', 'PERSON', 'EVENT'} and \
-                                str(t.norm_).lower() not in misspelled_words:
+                                           'LANGUAGE','DATE', 'PERSON', 'EVENT'} and \
+                        str(t.lemma_).lower() not in misspelled_words:
                             errors.add(t.i)
-                        elif t.norm_ in {'Microsoft', 'Google', 'Apple', 'Facebook'}:
+                        elif t.lemma_ in {'Microsoft', 'Google', 'Apple', 'Facebook'}:
                             errors.add(t.i)
         return errors
 
@@ -248,45 +236,42 @@ def models(user_input):
             length = d.end - d.start
             possible_errs = []
             for token in d:
-                if (str(token.pos_) == 'NOUN' or (len(str(token.text)) in {2, 3, 4})) and token.norm_ not in {'my',
-                                                                                                               'nail',
-                                                                                                               'kid'}:
+                if (str(token.pos_) == 'NOUN' or (len(str(token.text)) in {2,3,4})) and token.lemma_ not in {'my', 'nail', 'kid'}:
 
-                    possible_errs.append(token.i - d.start)
+                    possible_errs.append(token.i-d.start)
                     ttt = str(token.text).capitalize()
                     if len(str(token.text)) <= 4 and ttt not in {'New', 'San'}:
                         ttt = ttt.upper()
                     string += ttt
                 else:
                     if str(token.pos_) == 'PRON' and \
-                            token.norm_ == 'i' and not token.is_title:
-                        errors.append([num, [token.i - d.start], 'You should capitilize that word.'])
-                    elif str(token.pos_) == 'NNP' and not token.is_title:
-                        errors.append([num, [token.i - d.start], 'You should capitilize that word.'])
+                    token.lemma_ == 'I' and not token.is_title:
+                        errors.append([num, [token.i-d.start], 'You should capitilize that word.'])
+                    elif str(token.pos_) == 'NNP'and not token.is_title:
+                        errors.append([num, [token.i-d.start], 'You should capitilize that word.'])
                     string += token.text
-                if token.i - d.start < length - 1:
+                if token.i -d.start < length-1:
                     string += ' '
             possible_errs = set(possible_errs)
             more_errs = capitilise_error(string, possible_errs)
-            errs = possible_errs & set(more_errs)
+            errs = possible_errs&set(more_errs)
             if errs:
                 errors.append([num, list(errs), f'You should probably capitilize that word.'])
         return errors
-
-    def output_maker(data, all_errors):
+    def output_maker(data, all_errors ):
 
         created_output = [[i, '0', ''] for i in data.sents]
-        result = {j: [i, '0', ''] for j, i in enumerate(data.sents)}
+        result = {j:[i, '0', ''] for j,i in enumerate(data.sents)}
         if not all_errors:
             return created_output
         else:
             observed_sent = set()
             for error in all_errors:
-                if error[0] not in observed_sent:
+                if error[0] not in  observed_sent:
                     observed_sent.add(error[0])
                     sentence = created_output[error[0]][0]
-                    words = {i: word for i, word in enumerate(sentence)}
-                    # print('Words', words)
+                    words = {i:word for i, word in enumerate(sentence)}
+                    #print('Words', words)
                     words_sequence = []
                     words_check = []
                     all_err_in_sent = [i for i in all_errors if i[0] == error[0]]
@@ -308,9 +293,10 @@ def models(user_input):
                             add = [list(temp), err[2]]
 
                             words_sequence.append(add)
-                        words_err = words_err | set(err[1])
+                        words_err = words_err|set(err[1])
 
-                    words_sequence = sorted(words_sequence, key=lambda x: x[0])
+
+                    words_sequence = sorted(words_sequence, key = lambda x: x[0])
 
                     sentence_no_err = []
                     explicit = set()
@@ -320,8 +306,8 @@ def models(user_input):
                         if num not in words_err and num not in explicit:
 
                             if num != 0 and isinstance(sentence_no_err[-1], str):
-                                t = ' '
-                                if re.search(r'\.|\,|\?|\!|\)|\"|\'|\`', str(token)):
+                                t =' '
+                                if re.search(r'\.|\,|\?|\!|\)|"|\'|\`', str(token)):
                                     t = ''
                                 sentence_no_err[-1] += t
                                 sentence_no_err[-1] += str(token)
@@ -330,23 +316,29 @@ def models(user_input):
                         else:
                             errors = [err for err in words_sequence if err[0][0] == num]
                             for k in errors:
-                                explicit = explicit | set(k[0])
+                                explicit = explicit|set(k[0])
                                 sentence_no_err.append([k[0], '1', k[1]])
 
                     for k in range(len(sentence_no_err)):
                         element = sentence_no_err[k]
                         if isinstance(element[0], str):
-                            to_replace = [element, '0', '']
+                            to_replace =[element, '0', '']
                             sentence_no_err[k] = to_replace
                         else:
                             to_replace = [str(words[i]) for i in sorted(element[0])]
-                            # print('REPLACED', to_replace)
-                            to_replace = ' '.join(to_replace)
-                            if ' n\'t' in to_replace:
-                                to_replace = to_replace.replace(' n\'t', 'n\'t')
+                            #print('REPLACED', to_replace)
+                            to_rep = '' + to_replace[0]
+                            for word in to_replace[1:]:
+                                t = ' '
+                                if re.search(r'\.|\,|\?|\!|\)|"|\'|\`', str(word)):
+                                    t = ''
+                                to_rep += t
+                                to_rep += word
+                            to_replace = to_rep
                             sentence_no_err[k] = [to_replace, *element[1:]]
-                    # print(sentence_no_err)
+                    #print(sentence_no_err)
                     result[error[0]] = sentence_no_err
+
 
         return make_extended_out(result)
 
@@ -359,11 +351,7 @@ def models(user_input):
     all_errors = extra_inversion(doc, all_errors)
     all_errors = spelling(doc, all_errors)
     all_errors = capitalize(doc, all_errors)
-    # all_errors = extra_inversion(doc, all_errors)
     output = output_maker(doc, all_errors)
 
     return output
-
-
-# print(models('She works in microsoft. She works on monday. She was born in April.'))
-print(models('I wonder whether he did it or not.'))
+#print(models('She works in microsoft. She works on monday. She was born in April.'))
