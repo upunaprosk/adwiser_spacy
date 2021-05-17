@@ -37,7 +37,8 @@ def output_maker(data, all_errors):
                     k = error[0][1]
                 elif error[0] == last_interval[0]:
                     value = comments['comment' + str(last_interval[1])] + '\n' + error[-1]
-                    comments['comment' + str(last_interval[1])] = value
+                    if comments['comment' + str(last_interval[1])]!= error[-1]:
+                        comments['comment' + str(last_interval[1])] = value
 
 
             iter_comment += 1
