@@ -48,9 +48,10 @@ def tester(function, test_all=False):
                     result.loc[result.shape[0] + 1, 'sentence'] = str(sentence)
                     result.loc[result.shape[0] + 1, 'found_error'] = str(errs)
                 counter += 1
-                if not counter%500: print('Processed:', counter);
+                if not counter%200: print('Processed:', counter);
     txt_result.close()
-    result.to_excel('results/' + f'{function}{str(int(test_all))}' + '.xlsx')
+    if found:
+        result.to_excel('results/' + f'{function}{str(int(test_all))}' + '.xlsx')
     if not test_all:
         print(f'Found: {found} out of {out_of}')
     return
