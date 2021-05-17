@@ -13,7 +13,6 @@ Token.set_extension(name='span', getter=char_span)
 def find_span(tokens):
     if len(tokens) == 1:
         token = tokens[0]
-        print(token)
         return [token._.span[0], token._.span[1]]
     ss = min([s._.span[0] for s in tokens])
     s: Token
