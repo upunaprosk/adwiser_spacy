@@ -33,24 +33,24 @@ def tester(function, test_all=False):
         all_sentences = file.readlines()
         counter = 0
         #for sentence in all_sentences:
-        for sentence in all_sentences[:1000]:
-            errs = models(sentence, functions_to_test)
-            out_of += 1
-            if errs:
-                if not errs[0]: continue;
-                found += 1
-                found_sentences = sentence
-                if found: found_sentences += '\n';
-                if found <= 10:
-                    print(sentence)
-                txt_result.write(found_sentences)
-                result.loc[result.shape[0] + 1, 'sentence'] = str(sentence)
-                result.loc[result.shape[0] + 1, 'found_error'] = str(errs)
-            counter += 1
-            if counter%500: print('Processed:', counter);
+        for sentences in all_sentences[:1000]:
+            for sentence in sentences.split('\n'):
+                errs = models(sentence, functions_to_test)
+                out_of += 1
+                if errs:
+                    if not errs[0]: continue;
+                    found += 1
+                    found_sentences = sentence
+                    if found: found_sentences += '\n';
+                    if found <= 10:
+                        print(sentence)
+                    txt_result.write(found_sentences)
+                    result.loc[result.shape[0] + 1, 'sentence'] = str(sentence)
+                    result.loc[result.shape[0] + 1, 'found_error'] = str(errs)
+                counter += 1
+                if not counter%500: print('Processed:', counter);
     txt_result.close()
     result.to_excel('results/' + f'{function}{str(int(test_all))}' + '.xlsx')
-
     if not test_all:
         print(f'Found: {found} out of {out_of}')
     return
