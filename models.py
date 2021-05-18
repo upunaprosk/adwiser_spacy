@@ -55,6 +55,7 @@ def without_child(token, values):
     return True
 
 
+
 def models(text, test_mode=False):
     def pp_time(sent):
 
@@ -616,11 +617,11 @@ def generate_text(text):
     text_, errors = models(text)
     annotated_text, comments = output_maker(text_, errors)
     return annotated_text, comments
-
-
-nlp = spacy.load("en_core_web_lg")
-text_ = 'There have been little cheese.'
-doc_ = nlp(text_)
-for d in doc_.sents:
-    for t in d:
-        print(t, t.head, t._.tree_tag)
+#
+#
+# nlp = spacy.load("en_core_web_lg")
+# text_ = 'There have been little cheese.'
+# doc_ = nlp(text_)
+# for d in doc_.sents:
+#     for t in d:
+#         print(t, t.head, t._.tree_tag)
