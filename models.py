@@ -529,7 +529,7 @@ def models(text, test_mode=False):
                 if (i.text in uncount or i.text in count_sg) and 'Plur' in i.head.morph.get("Number"):
                     erroneous.append([find_span([i, i.head]), error_message])
             elif i.text in count_pl and 'Sing' in i.head.morph.get("Number"):
-                erroneous.append(d)
+                erroneous.append([find_span([i, i.head]), error_message])
             if i.text in quantifiers_of:
                 for child in i.children:
                     if child.text == 'of':
