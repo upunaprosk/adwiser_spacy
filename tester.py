@@ -92,7 +92,7 @@ def tester(function, test_all=False):
 # Результат - записывается в папку results/function.xlsx
 
 # observed_functions = {past_cont, redundant_comma, hardly, that_comma,
-#                       pp_time, only, inversion, extra_inversion, spelling, conditionals}
+#                       pp_time, only, inversion, extra_inversion, spelling, conditionals, quantifiers}
 # Доступные функции для теста в множестве выше
 for x in {'redundant_comma'}:
     tester(x, True)
