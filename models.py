@@ -258,6 +258,10 @@ def models(text, test_mode=False):
             if not sent[dep_matcher_(sent)[0][1][0]].i - sent.start:
                 verb_start = sent[dep_matcher_(sent)[0][1][-2]]
                 noun = sent[dep_matcher_(sent)[0][1][-1]]
+            for child in sent[dep_matcher_(sent)[0][1][0]].head.children:
+                if not without_child(child, {'dep_': 'prep', 'lemma_':'of'}):
+                    verb_start = ''
+                    break
         elif sent[0].lemma_ == 'only' and sent[0].dep_ == 'advmod':
             verbs = {}
             matcher_only = Matcher(vocab=nlp.vocab)
@@ -334,39 +338,39 @@ def models(text, test_mode=False):
         dep_matcher_.add('hardly', patterns=[hardly])
         dep_matcher_.add('sooner', patterns=[no_sooner])
         if dep_matcher_(sent):
+            if not sent[dep_matcher_(sent)[0][1][0]].i -sent.start:
+                matched = nlp.vocab[dep_matcher_(sent)[0][0]]
+                errors = []
+                root_ = sent.root
+                advcls = [x for x in sent if x.dep_ == 'advcl']
+                if advcls:
 
-            matched = nlp.vocab[dep_matcher_(sent)[0][0]]
-            errors = []
-            root_ = sent.root
-            advcls = [x for x in sent if x.dep_ == 'advcl']
-            if advcls:
+                    advcl = advcls[0]
+                    conj = ''
+                    allowed = ''
+                    if matched.text == 'hardly':  # TODO italics comment
+                        conj = [wh for wh in advcl.children if wh.dep_ == 'advmod' and wh.lemma_ in {'when', 'before'}]
+                        allowed = '\'when\' or \'before\''
+                    else:
 
-                advcl = advcls[0]
-                conj = ''
-                allowed = ''
-                if matched.text == 'hardly':  # TODO italics comment
-                    conj = [wh for wh in advcl.children if wh.dep_ == 'advmod' and wh.lemma_ in {'when', 'before'}]
-                    allowed = '\'when\' or \'before\''
-                else:
+                        conj = [wh for wh in advcl.children if wh.dep_ == 'mark' and wh.lemma_ == 'than']
+                        allowed = 'than'
+                    if not conj:
+                        hardly = sent[dep_matcher_(sent)[0][1][0]]
+                        errors.append([find_span([hardly]),
+                                       f'With such construction of the main clause, the next clause should be introduced with {allowed}.'])
 
-                    conj = [wh for wh in advcl.children if wh.dep_ == 'mark' and wh.lemma_ == 'than']
-                    allowed = 'than'
-                if not conj:
-                    hardly = sent[dep_matcher_(sent)[0][1][0]]
-                    errors.append([find_span([hardly]),
-                                   f'With such construction of the main clause, the next clause should be introduced with {allowed}.'])
+                    if not (sent[dep_matcher_(sent)[0][1][0]].tag_ == 'VBN' and [aux for aux in
+                                                                                 sent[dep_matcher_(sent)[0][1][0]].children
+                                                                                 if
+                                                                                 aux.dep_ == 'aux' and aux.pos_ == 'VBD' and aux.lemma_ == 'have']):
+                        errors.append([find_span([sent[dep_matcher_(sent)[0][1][0]]]),
+                                       'Past Perfect should be used in the main clause.'])
+                    for clause in advcls:
+                        verb = clause
 
-                if not (sent[dep_matcher_(sent)[0][1][0]].tag_ == 'VBN' and [aux for aux in
-                                                                             sent[dep_matcher_(sent)[0][1][0]].children
-                                                                             if
-                                                                             aux.dep_ == 'aux' and aux.pos_ == 'VBD' and aux.lemma_ == 'have']):
-                    errors.append([find_span([sent[dep_matcher_(sent)[0][1][0]]]),
-                                   'Past Perfect should be used in the main clause.'])
-                for clause in advcls:
-                    verb = clause
-
-                    if not (verb.tag_ == 'VBD' and without_child(verb, {'pos_': 'AUX', 'dep_': 'aux'})):
-                        errors.append([find_span([verb]), 'Past Simple should be used in this clause.'])
+                        if not (verb.tag_ == 'VBD' and without_child(verb, {'pos_': 'AUX', 'dep_': 'aux'})):
+                            errors.append([find_span([verb]), 'Past Simple should be used in this clause.'])
             return errors
 
     def conditionals(sent):
@@ -376,9 +380,9 @@ def models(text, test_mode=False):
             if root:
                 errors = []
                 will = [x for x in root.children if x.dep_ == 'aux' and x.lemma_ == 'will']
-                would = [x for x in root.children if x.dep_ == 'aux' and x.lemma_ == 'would']
+                would = [x for x in root.children if x.dep_ == 'aux' and x.lemma_ == 'would' and x.head.lemma_ != 'like']
                 advcls = [x for x in sent if x.dep_ == 'advcl' and [y for y in x.children if
-                                                                    y.lemma_ in {'whether', 'if'} and y.dep_ == 'mark']]
+                                                                    y.lemma_ in {'if'} and y.dep_ == 'mark']]
                 for advcl in advcls:
 
                     ss = 'http://realec-reference.site/viewArticle/CONDITIONAL%20SENTENCES'
@@ -420,12 +424,16 @@ def models(text, test_mode=False):
                       {'LEFT_ID': 'comma', 'REL_OP': '.', 'RIGHT_ID': 'that', 'RIGHT_ATTRS': {'LEMMA': 'that'}}]
         error_that.add('comma_that', [comma_that])
         if error_that(sent):
+            found_subj = [token.i for token in sent if 'subj' in str(token.dep_)]
+            found_subj.sort()
+            found_subj = found_subj[0].i
             errors = []
             for match in error_that(sent):
                 that = sent[match[1][-1]]
-                if that.dep_ in {'nsubj', 'nsubjpass'}:
-                    errors.append([find_span([sent[match[1][0]], that]),
-                                   'Instead of the comma, semicolon has to be used in front of \'that\'.'])
+                if 'subj' in str(that.dep_):
+                    if that.i != found_subj: # deleting cases as Unfortunately, that
+                        errors.append([find_span([sent[match[1][0]], that]),
+                                       'Instead of the comma, semicolon has to be used in front of \'that\'.'])
             first_that = sent[error_that(sent)[0][1][-1]]
             if first_that.dep_ == 'mark':
                 errors.append([find_span([sent[error_that(sent)[0][1][0]], first_that]),
@@ -477,7 +485,8 @@ def models(text, test_mode=False):
                 while_ = False
                 for advcl in advcls:
                     if any([while_.dep_ == 'mark'
-                            and while_.lemma_ in {'as', 'while'} for while_ in advcl.children]): while_ = True;break;
+                            and while_.lemma_ in {'as', 'while'} for while_ \
+                            in advcl.children]): while_ = True;break;
                 # TODO always/never/forever/constantly/permanently/eternally  | for ever
                 # Исключения: every ..
                 if not while_ or errors:
@@ -494,7 +503,6 @@ def models(text, test_mode=False):
         consider_that = [{'LEMMA': 'consider'}, {'LEMMA': 'that'}]
         matcher = Matcher(vocab=nlp.vocab)
         matcher.add("consider_that", patterns=[consider_that])
-
         for matched in matcher(sent):
             consider_that_errs.append([find_span([sent[matched[1]], sent[matched[2]]]), error_message])
         return consider_that_errs
@@ -578,7 +586,7 @@ def models(text, test_mode=False):
                     result.extend(sentence_err)
         return result
 
-    nlp = spacy.load("en_core_web_sm")
+    nlp = spacy.load("en_core_web_lg")
     text_ = preprocess(text)
     doc = nlp(text_)
     if test_mode:
