@@ -62,7 +62,7 @@ def tester(function, test_all=False):
         all_sentences = file.readlines()
         counter = 0
         # for sentence in all_sentences:
-        for sentences in all_sentences[:3000]:
+        for sentences in all_sentences:
             for sentence in sentences.split('\n'):
                 errs = models(sentence, functions_to_test)
                 out_of += 1
@@ -71,7 +71,7 @@ def tester(function, test_all=False):
                     found += 1
                     found_sentences = sentence
                     if found: found_sentences += '\n';
-                    if found <= 10:
+                    if found <= 100:
                         print(sentence)
                     txt_result.write(found_sentences)
                     result.loc[result.shape[0] + 1, 'sentence'] = str(sentence)
@@ -94,6 +94,5 @@ def tester(function, test_all=False):
 # observed_functions = {past_cont, redundant_comma, hardly, that_comma,
 #                       pp_time, only, inversion, extra_inversion, spelling, conditionals}
 # Доступные функции для теста в множестве выше
-for x in {'quantifiers', 'redundant_comma', 'hardly', 'that_comma', 'only', \
-          'inversion', 'extra_inversion', 'conditionals'}:
+for x in {'redundant_comma'}:
     tester(x, True)

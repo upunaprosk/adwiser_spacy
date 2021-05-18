@@ -619,7 +619,7 @@ def generate_text(text):
 
 
 nlp = spacy.load("en_core_web_lg")
-text_ = 'There have been a little cheese.'
+text_ = 'There have been little cheese.'
 doc_ = nlp(text_)
 for d in doc_.sents:
     for t in d:

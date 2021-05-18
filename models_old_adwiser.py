@@ -898,3 +898,5 @@ main()
 # tt_install.sh
 
 # if errors occur: unpack tt/tree-tagger-MacOSX-3.2.3.tar.gz
+
+# tags: http://www.natcorp.ox.ac.uk/docs/bnc2guide.htm#tagset
