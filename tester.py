@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore")
 from models import models
 
 import pandas as pd
