@@ -5,10 +5,19 @@ from spacy.tokens import Token
 from annotator import output_maker
 from spacy.matcher import DependencyMatcher
 from spacy.matcher import Matcher
+import treetaggerwrapper
 
+tagger = treetaggerwrapper.TreeTagger(TAGLANG='en', TAGDIR='tt/')
 char_span = lambda token: (token.idx, token.idx + len(token.text))
 Token.set_extension(name='span', getter=char_span)
-
+def tree_tag_(token):
+    doc_ = token.doc
+    tags_ = tagger.tag_text(str(doc_))
+    tags_ = tags_[token.i]
+    _, tag, _ = tags_.split('\t')
+    return tag
+tree_tag = lambda token: tree_tag_(token)
+Token.set_extension(name='tree_tag', getter=tree_tag)
 
 def find_span(tokens):
     if len(tokens) == 1:
@@ -607,3 +616,11 @@ def generate_text(text):
     text_, errors = models(text)
     annotated_text, comments = output_maker(text_, errors)
     return annotated_text, comments
+
+
+nlp = spacy.load("en_core_web_lg")
+text_ = 'There have been a little cheese.'
+doc_ = nlp(text_)
+for d in doc_.sents:
+    for t in d:
+        print(t, t.head, t._.tree_tag)
