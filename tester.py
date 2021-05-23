@@ -34,7 +34,10 @@ import pandas as pd
 #     table.to_excel('result/comp_' + f'{file}' + '.xlsx')
 #     return
 
+from functools import lru_cache
 
+
+@lru_cache(maxsize=None)
 def tester(function, test_all=False):
     """
     Создает Excel таблицу с ошибками, найденными функцией в файле input.
@@ -64,9 +67,10 @@ def tester(function, test_all=False):
         all_sentences = file.readlines()
         counter = 0
         # for sentence in all_sentences:
-        for sentences in all_sentences:
+        for sentences in all_sentences[:16000]:
 
             for sentence in sentences.split('\n'):
+                # print(sentence)
                 if sentence:
                     errs = models(sentence, functions_to_test)
                     out_of += 1
@@ -75,7 +79,7 @@ def tester(function, test_all=False):
                         found += 1
                         found_sentences = sentence
                         if found: found_sentences += '\n';
-                        if found <= 10:
+                        if found <= 15:
                             print(sentence)
                         txt_result.write(found_sentences)
                         result.loc[result.shape[0] + 1, 'sentence'] = str(sentence)
@@ -98,5 +102,5 @@ def tester(function, test_all=False):
 # observed_functions = {past_cont, redundant_comma, hardly, that_comma,
 #                       pp_time, only, inversion, extra_inversion, spelling, conditionals, quantifiers}
 # Доступные функции для теста в множестве выше
-for x in {'redundant_comma'}:
+for x in {'inversion'}:
     tester(x, True)

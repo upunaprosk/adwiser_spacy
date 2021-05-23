@@ -897,6 +897,9 @@ main()
 # To install: pip install treetaggerwrapper
 # tt_install.sh
 
-# if errors occur: unpack tt/tree-tagger-MacOSX-3.2.3.tar.gz
+# If errors (with TreeTagger) occur:
+# unpack tt/tree-tagger-MacOSX-3.2.3.tar.gz
+# Same files for other operation systems can be downloaded from:
+# https://cis.lmu.de/~schmid/tools/TreeTagger/
 
-# tags: http://www.natcorp.ox.ac.uk/docs/bnc2guide.htm#tagset
+# Tags: http://www.natcorp.ox.ac.uk/docs/bnc2guide.htm#tagset

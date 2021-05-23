@@ -1,3 +1,5 @@
+# import warnings
+# warnings.filterwarnings("ignore")
 import re
 import spacy
 from autocorrect import Speller
@@ -5,19 +7,27 @@ from spacy.tokens import Token
 from annotator import output_maker
 from spacy.matcher import DependencyMatcher
 from spacy.matcher import Matcher
-import treetaggerwrapper
 
-tagger = treetaggerwrapper.TreeTagger(TAGLANG='en', TAGDIR='tt/')
+# import treetaggerwrapper
+
+nlp = spacy.load("en_core_web_lg")
+# tagger = treetaggerwrapper.TreeTagger(TAGLANG='en', TAGDIR='tt/')
 char_span = lambda token: (token.idx, token.idx + len(token.text))
 Token.set_extension(name='span', getter=char_span)
-def tree_tag_(token):
-    doc_ = token.doc
-    tags_ = tagger.tag_text(str(doc_))
-    tags_ = tags_[token.i]
-    _, tag, _ = tags_.split('\t')
-    return tag
-tree_tag = lambda token: tree_tag_(token)
-Token.set_extension(name='tree_tag', getter=tree_tag)
+
+
+#
+# def tree_tag_(token):
+#     doc_ = token.doc
+#     tags_ = tagger.tag_text(str(doc_))
+#     tags_ = tags_[token.i]
+#     _, tag, _ = tags_.split('\t')
+#     return tag
+#
+#
+# tree_tag = lambda token: tree_tag_(token)
+# Token.set_extension(name='tree_tag', getter=tree_tag)
+
 
 def find_span(tokens):
     if len(tokens) == 1:
@@ -55,11 +65,9 @@ def without_child(token, values):
     return True
 
 
-
 def models(text, test_mode=False):
     def pp_time(sent):
 
-        # past perfect can be
         errors_pp = []
         all_errors = []
         dep_matcher = DependencyMatcher(vocab=nlp.vocab)
@@ -83,7 +91,7 @@ def models(text, test_mode=False):
             dep_matcher_.add('prep+cd', patterns=[patt_one])
             dep_matches = dep_matcher_(sent)
 
-            # + у последнего нет детей с леммой recent/last!!!
+            # + у последнего нет детей с леммой recent/last
             if dep_matches and without_child(sent[dep_matches[0][1][1]], {'lemma_': ['last', 'recent']}):
                 all_matches.append(dep_matches[0][1][0])
                 if sent[dep_matches[0][1][0]].head.tag_ == 'VBN':
@@ -142,7 +150,7 @@ def models(text, test_mode=False):
             for yestdy in yesterday:
                 if yestdy.head.head.head.tag_ == 'VBN':
                     verbs.append(yestdy.head.head.head)
-            # поиск verbs
+            # Verbs
             if dep_matcher_(sent):
                 for match_dep in dep_matcher_(sent):
                     if sent[match_dep[1][0]].head.tag_ == 'VBN':
@@ -153,7 +161,7 @@ def models(text, test_mode=False):
                             all_errors.append([find_span([tok]),
                                                'You may need \'from\' instead of \'since\'.'])
 
-            # теперь have + not от каждого глагола + ошибки
+            # have + not от каждого глагола + ошибки
             for verb in verbs:
                 if verb.tag_ == 'VBN':
 
@@ -174,9 +182,11 @@ def models(text, test_mode=False):
 
         def find_wrong_order(token_i):
 
-            possible_inversions = {'barely', 'never', 'rarely', 'hardly', 'seldom',
+            possible_inversions = {'barely', 'never', 'rarely', 'seldom',
                                    'scarcely', 'nowhere', 'neither', 'nor'}
-            if token_i.lemma_ in possible_inversions:
+            if token_i.lemma_ in possible_inversions and not re.search(r'^Never the', token.sent.text):
+                return True
+            elif token_i.lemma_ in {'hardly', 'not'} and token.sent[token.i + 1].pos_ != 'NOUN':
                 return True
             elif token_i.lemma_ == 'little' and token_i.dep_ in {'npadvmod', 'dobj', 'advmod'}:
                 if without_child(token_i, {'lemma_': 'by'}):
@@ -188,11 +198,11 @@ def models(text, test_mode=False):
 
             return False
 
-        for token in sent:  # for future modifications
+        for token in sent:  # for future modifications (for several clauses in a sent)
             flag = False
             if not (token.i - sent.start):
                 prep_no_noun = [{'RIGHT_ID': 'prep',
-                                 'RIGHT_ATTRS': {'LEMMA': {'IN': ['under', 'in', 'over', 'at', 'for', 'to', 'with']},
+                                 'RIGHT_ATTRS': {'LEMMA': {'IN': ['under', 'in', 'over', 'at', 'for', 'to']},
                                                  'TAG': 'IN'}},
                                 {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun', 'RIGHT_ID': 'noun',
                                  'RIGHT_ATTRS': {'POS': 'NOUN'}},
@@ -265,29 +275,33 @@ def models(text, test_mode=False):
         verb_start = None
         noun = None
         if dep_matcher_(sent):
+
             if not sent[dep_matcher_(sent)[0][1][0]].i - sent.start:
                 verb_start = sent[dep_matcher_(sent)[0][1][-2]]
                 noun = sent[dep_matcher_(sent)[0][1][-1]]
             for child in sent[dep_matcher_(sent)[0][1][0]].head.children:
-                if not without_child(child, {'dep_': 'prep', 'lemma_':'of'}):
+                if sent[dep_matcher_(sent)[0][1][0]].head.dep_ == 'nummod' or \
+                        not without_child(child, {'dep_': 'prep', 'lemma_': 'of'}):
                     verb_start = ''
+
                     break
         elif sent[0].lemma_ == 'only' and sent[0].dep_ == 'advmod':
-            verbs = {}
-            matcher_only = Matcher(vocab=nlp.vocab)
-            matcher_only.add('verb', patterns=[[{'POS': 'VERB'}]])
-            if len(matcher_only(sent)) == 1:
-                verb_start = sent[matcher_only(sent)[0][1]]
-                noun = [n for n in verb_start.children if n.dep_ in ['nsubj', 'nsubjpass']]
-                if noun:
-                    noun = noun[0]
-        if noun and verb_start:
-            aux_ = [aux for aux in verb_start.children if aux.pos_ == 'AUX']
-            if aux_:
-                verb_start = aux_[0]
-            if verb_start.i > noun.i:
-                err = [[find_span([verb_start]), error_message]]
-                return err
+            if sent[0].head.dep_ != 'nummod':
+                verbs = {}
+                matcher_only = Matcher(vocab=nlp.vocab)
+                matcher_only.add('verb', patterns=[[{'POS': 'VERB'}]])
+                if len(matcher_only(sent)) == 1:
+                    verb_start = sent[matcher_only(sent)[0][1]]
+                    noun = [n for n in verb_start.children if n.dep_ in ['nsubj', 'nsubjpass']]
+                    if noun:
+                        noun = noun[0]
+            if noun and verb_start:
+                aux_ = [aux for aux in verb_start.children if aux.pos_ == 'AUX']
+                if aux_:
+                    verb_start = aux_[0]
+                if verb_start.i > noun.i:
+                    err = [[find_span([verb_start]), error_message]]
+                    return err
         return
 
     def extra_inversion(sent):
@@ -326,7 +340,6 @@ def models(text, test_mode=False):
         spell = Speller(lang='en')
         errors = []
         for token in sent:
-            # print('SPELLING',spell(str(token.text)) )
             if str(spell(str(token.text))) != str(token.text):
                 errors.append([find_span([token]),
                                f'You might have misspelled that word, possible '
@@ -347,10 +360,11 @@ def models(text, test_mode=False):
         dep_matcher_ = DependencyMatcher(vocab=nlp.vocab)
         dep_matcher_.add('hardly', patterns=[hardly])
         dep_matcher_.add('sooner', patterns=[no_sooner])
+        errors = []
         if dep_matcher_(sent):
-            if not sent[dep_matcher_(sent)[0][1][0]].i -sent.start:
+            if not sent[dep_matcher_(sent)[0][1][0]].i - sent.start:
                 matched = nlp.vocab[dep_matcher_(sent)[0][0]]
-                errors = []
+
                 root_ = sent.root
                 advcls = [x for x in sent if x.dep_ == 'advcl']
                 if advcls:
@@ -371,7 +385,8 @@ def models(text, test_mode=False):
                                        f'With such construction of the main clause, the next clause should be introduced with {allowed}.'])
 
                     if not (sent[dep_matcher_(sent)[0][1][0]].tag_ == 'VBN' and [aux for aux in
-                                                                                 sent[dep_matcher_(sent)[0][1][0]].children
+                                                                                 sent[dep_matcher_(sent)[0][1][
+                                                                                     0]].children
                                                                                  if
                                                                                  aux.dep_ == 'aux' and aux.pos_ == 'VBD' and aux.lemma_ == 'have']):
                         errors.append([find_span([sent[dep_matcher_(sent)[0][1][0]]]),
@@ -390,7 +405,8 @@ def models(text, test_mode=False):
             if root:
                 errors = []
                 will = [x for x in root.children if x.dep_ == 'aux' and x.lemma_ == 'will']
-                would = [x for x in root.children if x.dep_ == 'aux' and x.lemma_ == 'would' and x.head.lemma_ != 'like']
+                would = [x for x in root.children if
+                         x.dep_ == 'aux' and x.lemma_ == 'would' and x.head.lemma_ != 'like']
                 advcls = [x for x in sent if x.dep_ == 'advcl' and [y for y in x.children if
                                                                     y.lemma_ in {'if'} and y.dep_ == 'mark']]
                 for advcl in advcls:
@@ -421,11 +437,13 @@ def models(text, test_mode=False):
 
                         if not (past_perfect | past_simple):
                             errors.append([find_span([verb]),
-                                           r'In if-clauses talking about unreal conditions, Past Simple or Past Perfect are expected.(More examples: http://realec-reference.site/viewArticle/CONDITIONAL%20SENTENCES) '])
+                                           r'In if-clauses talking about unreal conditions, Past Simple or '
+                                           r'Past Perfect are expected.(More examples: '
+                                           r'http://realec-reference.site/viewArticle/CONDITIONAL%20SENTENCES) '])
 
                 return errors
             # TODO if/provided/providing/unless/on condition/lest
-            # TODO: hidden conditionals: were I to do, .. Without my friends I wouldnt be able Had he come on time
+            # TODO: hidden conditionals: Were I to do, .. Without my friends I wouldnt be able Had he come on time
 
     def that_comma(sent):
 
@@ -441,7 +459,7 @@ def models(text, test_mode=False):
             for match in error_that(sent):
                 that = sent[match[1][-1]]
                 if 'subj' in str(that.dep_):
-                    if that.i != found_subj: # deleting cases as Unfortunately, that
+                    if that.i != found_subj:  # deleting cases as Unfortunately, that
                         errors.append([find_span([sent[match[1][0]], that]),
                                        'Instead of the comma, semicolon has to be used in front of \'that\'.'])
             first_that = sent[error_that(sent)[0][1][-1]]
@@ -452,9 +470,8 @@ def models(text, test_mode=False):
         return
 
     def punct(sent):
+        # TODO in addition, - однозначный случай / in addition to зависимые от addition
         pass
-
-    # in addition, - однозначный случай / in addition to зависимые от addition ,
 
     def redundant_comma(sent):
 
@@ -476,9 +493,11 @@ def models(text, test_mode=False):
         first = True
         for match in error_clause(sent):
             if first:
-                first = False
-                errors.append([find_span([sent[match[1][-1]], sent[match[1][-2]]]),
-                               'You may have used a redundant comma in front of this conjunction.'])
+                if 'subj' not in sent[match[1][-2]].dep_:
+                    first = False
+
+                    errors.append([find_span([sent[match[1][-1]], sent[match[1][-2]]]),
+                                   'You may have used a redundant comma in front of this conjunction.'])
         return errors
 
     def past_cont(sent):
@@ -571,7 +590,9 @@ def models(text, test_mode=False):
         pass
 
     def preprocess(sentences):
-        sentence_dots = re.sub(r'\.', '. ', sentences)
+        sentence_dots: str = re.sub(r'\.', '. ', sentences)
+        sentence_dots = re.sub(r'\.\s\.\s\.', '...', sentence_dots)
+        sentence_dots = re.sub(r'\.\s\.', '..', sentence_dots)
         sentence_dots = re.sub(r'\!', '! ', sentence_dots)
         sentence_dots = re.sub(r'\?', '? ', sentence_dots)
         sentence_dots = re.sub(r'\s\s', ' ', sentence_dots)
@@ -596,7 +617,6 @@ def models(text, test_mode=False):
                     result.extend(sentence_err)
         return result
 
-    nlp = spacy.load("en_core_web_lg")
     text_ = preprocess(text)
     doc = nlp(text_)
     if test_mode:
@@ -617,11 +637,17 @@ def generate_text(text):
     text_, errors = models(text)
     annotated_text, comments = output_maker(text_, errors)
     return annotated_text, comments
+
+
 #
 #
 # nlp = spacy.load("en_core_web_lg")
-# text_ = 'There have been little cheese.'
+# text_ = 'I have been a student last summer.'
 # doc_ = nlp(text_)
 # for d in doc_.sents:
 #     for t in d:
-#         print(t, t.head, t._.tree_tag)
+#         print(t, t.head, t.dep_, t.tag_, t.pos_, t._.tree_tag)
+#
+print(models(('If I am there, there wouldn\'t be..')))
+# 12 % nummod CD NUM CRD
+# sixteen percent nummod CD NUM CRD

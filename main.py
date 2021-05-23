@@ -15,38 +15,36 @@ from models import generate_text
 #     return tokens_soup, comments
 
 
-def annotate_print(text):
-    tokens_soup, comments = annotate(text)
-    result_trial = ''
-    for token in tokens_soup:
-        text = text.replace(token[0], chr(8), 1)
-    flag = False
-    #print('token_soup', tokens_soup)
-    #print('comments', comments)
-    for k, token in enumerate(tokens_soup):
-        entry = ""
-        if token[1] == 1:
-            if "comment" + str(k) in comments:
-                if flag:
-                    entry += ' '
-                entry += '<div class="duo"'
-                entry += ' id="' + "comment" + str(k) + 'link"'
-                entry += ' onclick="popupbox(event,'
-                entry += "'" + "comment" + str(k) + "'" + ')">'
-                flag = True
-            else:
-                entry += '<div class="duo">'
-        entry += token[0]
-
-        if token[1] == 1:
-            entry += '</div>'
-
-        result_trial += entry
-
-    # text = text.replace("\n", "<br>")
-    result_trial = result_trial.replace("\n", "<br>")
-    # print(result_trial)
-    return result_trial, comments
+# def annotate_print(text):
+#     tokens_soup, comments = annotate(text)
+#     result_trial = ''
+#     for token in tokens_soup:
+#         text = text.replace(token[0], chr(8), 1)
+#     flag = False
+#     for k, token in enumerate(tokens_soup):
+#         entry = ""
+#         if token[1] == 1:
+#             if "comment" + str(k) in comments:
+#                 if flag:
+#                     entry += ' '
+#                 entry += '<div class="duo"'
+#                 entry += ' id="' + "comment" + str(k) + 'link"'
+#                 entry += ' onclick="popupbox(event,'
+#                 entry += "'" + "comment" + str(k) + "'" + ')">'
+#                 flag = True
+#             else:
+#                 entry += '<div class="duo">'
+#         entry += token[0]
+#
+#         if token[1] == 1:
+#             entry += '</div>'
+#
+#         result_trial += entry
+#
+#     # text = text.replace("\n", "<br>")
+#     result_trial = result_trial.replace("\n", "<br>")
+#     # print(result_trial)
+#     return result_trial, comments
 
 
 app = Flask(__name__)
