@@ -586,8 +586,74 @@ def models(text, test_mode=False):
                     erroneous.append([find_span([i]), error_message])
         return erroneous
 
-    def polarity(sent):
-        pass
+    def polarity(sentence):
+        # Checks if any polarity items were used in the wrong context
+
+        neg_error_message = 'This item can only be used in negative contexts.'
+        pos_error_message = 'This item can only be used in positive contexts.'
+        polarity_errors = []
+
+        negation = r"[Nn]['`’o]t\b|[Nn]ever(?!theless| the less)|\b[Nn]o\b|[Nn]owhere|[Nn]othing|[Nn]one|[Nn]oone|[Nn]either|"
+        negation += r'[Hh]ardly|[Ss]carcely|[Bb]arely|^[Ff]ew|(?<![Aa] )[Ff]ew|[Nn]or|[Ll]ack|[Ss]top|[Aa]ny'
+        ifclause = r'\b[Ii]f\b|[Ww]hether'
+        negative_lic = re.compile('|'.join((negation, ifclause)))
+        neg_gr = r'at all|whatsoever|just yet|yet'
+        neg_exp = r'lift[a-z]{0,3} a finger|(sleep[a-z]{0,3}|slept) a wink|bat[a-z]{0,4} an eye|((takes?|took|taking)|(last[a-z]{0,3})) long\b|(drink[a-z]{0,3}|drank|drunk) a drop|(mean|small) feat'
+        neg_exp += r'|put( \w+?| ) ?finger on|(thinks?|thought) much '
+        temporal_neg_exp = r'in (?:hours|days|weeks(?! [0-9])|months(?! [JFMASOD])|years(?! gone| past| [a-zA-Z]*? ?[0-9])|decades|yonks|eons|a million years|ages(?! [0-9])|donkey\'s years)'
+        neg_pol = re.compile('|'.join([neg_gr, neg_exp, temporal_neg_exp]))
+        pos_pol = re.compile(r'already|somewhat|too')
+
+        words = ' '.join([token.text for token in sentence])
+        # When there is a negative polarity item but no prior negation
+        neg = re.search(neg_pol, words)
+        if sentence.text[-1] != '?' and neg:
+            neg_token = None
+            licensed = False
+            for token in sentence:
+                # Presuming if the whole NP expression is in the scope of negation then its every element will be too
+                # Hence only check the first word of the NPI to match a token
+                if token.text == neg.group().split()[0]:
+                    neg_token = token  # technically a faulty verification, esp. with 'at all' where 'at' can be repeated later and therefore mixed up, but will have to do for now
+            if neg_token:
+                if (neg_token.text == 'at' and neg_token.dep_ != 'advmod') or (
+                        neg_token.text == 'yet' and neg_token.head.lemma_ != 'have' and neg_token.head.dep_ != 'aux'):
+                    licensed = True  # Not licensed per se, but rather not an NPI at all
+                lic = re.findall(negative_lic, words)
+                for l in lic:
+                    for token in sentence:
+                        # An NPI is licensed when it's within the scope of (i.e. c-commanded by) a negation
+                        if token.text == l and (token.head.is_ancestor(neg_token) or token.is_ancestor(neg_token)):
+                            licensed = True
+                if not licensed:
+                    polarity_errors.append([find_span([neg_token]),
+                                            neg_error_message])  # if more than one word in polarity item, only finds the first one
+
+        # todo add superlative licensing for temporal PI
+
+        # When there is a positive polarity item but it is negated
+        pos = re.search(pos_pol, words)
+        if pos:
+            pos_token = None
+            licensed = True
+            for token in sentence:
+                if token.text == pos.group().split()[0]:
+                    pos_token = token
+            if pos_token:
+                anti_lic = re.findall(negation, words)
+                for al in anti_lic:
+                    for token in sentence:
+                        if token.text == al and token.is_ancestor(pos_token):
+                            licensed = False
+                if pos_token.text == 'too' and pos_token.i != len(doc) - 1:
+                    if pos_token.nbor().text in ['much', 'many'] or pos_token.nbor().pos_ == 'ADJ':
+                        licensed = True  # Not licensed per se, but rather not a PPI at all
+                if not licensed:
+                    polarity_errors.append([find_span([pos_token]), pos_error_message])
+
+        # Checking if negation's parent is an ancestor of a PPI yields too many false positives
+
+        return polarity_errors
 
     def preprocess(sentences):
         sentence_dots: str = re.sub(r'\.', '. ', sentences)
@@ -607,8 +673,8 @@ def models(text, test_mode=False):
 
 
         else:
-            observed_functions = {quantifiers, past_cont, redundant_comma, hardly, that_comma,
-                                  pp_time, only, inversion, extra_inversion, spelling, conditionals, consider_that}
+            observed_functions = {quantifiers, past_cont, redundant_comma, hardly, that_comma, pp_time,
+                                  only, inversion, extra_inversion, spelling, conditionals, consider_that, polarity}
 
             apply_ = lambda f, given_: f(given_)
             for function in observed_functions:
