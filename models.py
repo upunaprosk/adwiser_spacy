@@ -586,7 +586,7 @@ def models(text, test_mode=False):
                     erroneous.append([find_span([i]), error_message])
         return erroneous
 
-    def polarity(sent):
+    def polarity(sentence):
         # Checks if any polarity items were used in the wrong context
 
         neg_error_message = 'This item can only be used in negative contexts.'
