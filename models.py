@@ -2,12 +2,11 @@
 # warnings.filterwarnings("ignore")
 import re
 import spacy
-from autocorrect import Speller
 from spacy.tokens import Token
 from annotator import output_maker
 from spacy.matcher import DependencyMatcher
 from spacy.matcher import Matcher
-
+from spellchecker import SpellChecker
 # import treetaggerwrapper
 
 nlp = spacy.load("en_core_web_lg")
@@ -83,8 +82,9 @@ def models(text, test_mode=False):
             verbs = []
             dep_matcher_ = DependencyMatcher(vocab=nlp.vocab)
 
-            # in/from/over/between+CD
-            patt_one = [{'RIGHT_ID': 'prep', 'RIGHT_ATTRS': {'LEMMA': {'IN': ['from', 'in', 'over', 'between']}}},
+            # in/from/over/between + CD
+            patt_one = [{'RIGHT_ID': 'prep', 'RIGHT_ATTRS':
+                {'LEMMA': {'IN': ['from', 'in', 'over', 'between']}}},
                         {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'year',
                          'RIGHT_ATTRS': {'TAG': 'CD', 'DEP': 'pobj'}}]
 
@@ -306,7 +306,7 @@ def models(text, test_mode=False):
 
     def extra_inversion(sent):
 
-        error_message = 'You may need standard word order here.'
+        error_message = 'You may have used the wrong word order'
         if '"' not in sent.text and '"' not in sent.text:
             dep_matcher_ = DependencyMatcher(vocab=nlp.vocab)
             ccomp_ = [{'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'DEP': 'ROOT'}},
@@ -337,13 +337,15 @@ def models(text, test_mode=False):
             return
 
     def spelling(sent):
-        spell = Speller(lang='en')
+        spell = SpellChecker()
         errors = []
         for token in sent:
-            if str(spell(str(token.text))) != str(token.text):
+            if len(token.text) <4:continue;
+            if str(spell.correction(token.text)) != str(token.text):
+                candidates = "/".join(spell.candidates(token.text))
                 errors.append([find_span([token]),
                                f'You might have misspelled that word, possible '
-                               f'correction: {str(spell(str(token.text)))}.'])
+                               f'correction: {candidates}.'])
         return errors
 
     def hardly(sent):
@@ -443,7 +445,6 @@ def models(text, test_mode=False):
 
                 return errors
             # TODO if/provided/providing/unless/on condition/lest
-            # TODO: hidden conditionals: Were I to do, .. Without my friends I wouldnt be able Had he come on time
 
     def that_comma(sent):
 
@@ -454,7 +455,7 @@ def models(text, test_mode=False):
         if error_that(sent):
             found_subj = [token.i for token in sent if 'subj' in str(token.dep_)]
             found_subj.sort()
-            found_subj = found_subj[0].i
+            found_subj = found_subj[0]
             errors = []
             for match in error_that(sent):
                 that = sent[match[1][-1]]
@@ -535,9 +536,6 @@ def models(text, test_mode=False):
         for matched in matcher(sent):
             consider_that_errs.append([find_span([sent[matched[1]], sent[matched[2]]]), error_message])
         return consider_that_errs
-
-    def captization(sent):
-        pass
 
     def agreement_s_v(sent):
         pass
@@ -674,7 +672,8 @@ def models(text, test_mode=False):
 
         else:
             observed_functions = {quantifiers, past_cont, redundant_comma, hardly, that_comma, pp_time,
-                                  only, inversion, extra_inversion, spelling, conditionals, consider_that, polarity}
+                                  only, inversion, extra_inversion, spelling, conditionals,
+                                  consider_that, polarity}
 
             apply_ = lambda f, given_: f(given_)
             for function in observed_functions:
@@ -714,6 +713,6 @@ def generate_text(text):
 #     for t in d:
 #         print(t, t.head, t.dep_, t.tag_, t.pos_, t._.tree_tag)
 #
-print(models(('If I am there, there wouldn\'t be..')))
+print(generate_text('If I am there, there wouldn\'t be..'))
 # 12 % nummod CD NUM CRD
 # sixteen percent nummod CD NUM CRD

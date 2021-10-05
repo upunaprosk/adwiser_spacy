@@ -13,7 +13,16 @@
 #
 # 'You may have wrongly used the verb CONSIDER with THAT.' \
 # 'That might be an erroneous use of quantifiers'
+
+import csv
 def output_maker(data, all_errors):
+    def find_color(comment_string):
+        with open(r'./comment-color.txt', mode='r') as csv_file:
+            reader = csv.DictReader(csv_file)
+            for com in reader:
+                if comment_string.startswith(com['Comment']):
+                    return com["HEX"]
+        return '#ff8c00'
     comments = dict()
     annotated = ''
     if not all_errors:
@@ -37,11 +46,12 @@ def output_maker(data, all_errors):
                     annotated += data[k:error[0][0]]
                     if k-error[0][0]:
                         if error[0][0]-k >0 and data[k:error[0][0]] != '\n':
-
                             iter_comment+=1;
 
+                    # comment = error[-1]
+                    color = find_color(error[-1])
+                    annotated += f'<div class="duo"  style="background: {color}" id="comment{iter_comment}link"'
 
-                    annotated += f'<div class="duo" id="comment{iter_comment}link"'
                     annotated += ' onclick="popupbox(event,'
                     annotated += "'" + f'comment{iter_comment}' + "'" + ')"> <b>'
                     annotated += data[error[0][0]:error[0][1]]
