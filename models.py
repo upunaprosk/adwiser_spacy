@@ -9,7 +9,7 @@ from spacy.matcher import Matcher
 from spellchecker import SpellChecker
 # import treetaggerwrapper
 
-nlp = spacy.load("en_core_web_lg")
+nlp = spacy.load("en_core_web_sm")
 # tagger = treetaggerwrapper.TreeTagger(TAGLANG='en', TAGDIR='tt/')
 char_span = lambda token: (token.idx, token.idx + len(token.text))
 Token.set_extension(name='span', getter=char_span)
@@ -547,43 +547,93 @@ def models(text, test_mode=False):
         pass
 
     def quantifiers(sent):
+        # you may specify your own list of uncountable nouns here
+        unc_list0 = []
+        unc_list = unc_list0 + ['experience', 'discussion', 'effort', 'support', 'stress', 'care', 'suffering', 'crime',
+                                'noise', 'trouble', 'influence', 'space']
         erroneous = []
-        error_message = 'That might be an erroneous use of quantifiers'
         uncount = ['much', 'less', 'least']
-        uncount_of = ['deal', 'amount']
-        count_pl = ['many', 'few', 'fewer', 'fewest', 'several']
-        count_pl_of = ['number', 'numbers', 'couple', 'hundreds', \
-                       'thousands', 'millions', 'billions']
-        count_sg = ['each', 'every', 'another']
-        # uncount_count_pl = ['some', 'all', 'no'] невозможно проверить без списка uncountable
-        # uncount_count_pl_of = ['lot', 'lots', 'none'] невозможно проверить без списка uncountable
-        quantifiers_ = uncount + count_pl + count_sg
-        quantifiers_of = uncount_of + count_pl_of
-        for i in sent:
-            if i.text in quantifiers_:
-                if (i.text in uncount or i.text in count_sg) and 'Plur' in i.head.morph.get("Number"):
-                    erroneous.append([find_span([i, i.head]), error_message])
-            elif i.text in count_pl and 'Sing' in i.head.morph.get("Number"):
-                erroneous.append([find_span([i, i.head]), error_message])
-            if i.text in quantifiers_of:
-                for child in i.children:
-                    if child.text == 'of':
-                        for c in child.children:
-                            if i.text in uncount_of and 'Plur' in c.morph.get("Number"):
-                                erroneous.append([find_span([i, c]), error_message])
-                            elif i.text in count_pl_of and 'Sing' in c.morph.get("Number"):
-                                erroneous.append([find_span([i, c]), error_message])
-            if i.text == 'both':
-                all_c = [x for x in i.head.children]
-                if i.head.morph.get("Number") == 'Plur':
-                    pass
-                elif len(all_c) > 2:
-                    if all_c[1].text != 'and' and (all_c[2].pos_ != 'NOUN' or all_c[2].pos_ != 'PRON'):
-                        erroneous.append([find_span([i]), error_message])
-                else:
-                    erroneous.append([find_span([i]), error_message])
-        return erroneous
+        uncount_of = ['deal', 'amount', 'smidge', 'much']
+        count_pl = ['many', 'few', 'fewer', 'fewest', 'several', 'various', 'numerous', 'countless']
+        count_pl_special = ['these', 'those']
+        count_pl_of = ['number', 'numbers', 'couple', 'dozens', 'hundreds', 'thousands', 'millions', 'billions',
+                       'zillions', 'dozen', 'hundred', 'thousand', 'million', 'billion', 'zillion', 'one', 'each',
+                       'every', 'either', 'neither', 'both', 'several', 'few', 'various', 'countless', 'numerous',
+                       'another']
+        count_sg_pl_quantified = ['each', 'every', 'another']
+        uncount_count_sg = ['this', 'that', 'one']
+        # needs uncountable words list to be checked
+        # uncount_count_pl = ['enough'] #needs uncountable words list to be checked    uncount_count_pl_of = ['lot', 'lots', 'none', 'bags', 'heaps', 'loads', 'oodles', 'stacks']
+        uncount_count_pl = ['enough']
+        uncount_count_pl_of = ['lot', 'lots', 'none', 'bags', \
+                               'heaps', 'loads', 'oodles', 'stacks']
 
+        quantifiers = uncount + count_pl + uncount_count_sg + uncount_count_pl
+        quantifiers_of = uncount_of + count_pl_of + uncount_count_pl_of
+        for i in sent:
+            if i.text.lower() in quantifiers:
+                if (i.text.lower() in uncount or i.text.lower() in uncount_count_sg) \
+                        and 'Plur' in i.head.morph.get("Number") and i.head.pos_ == 'NOUN':
+                    if i.text.lower() == 'that' and (i.pos_ == 'SCONJ' or i.dep_ != 'det'):
+                        pass
+                    elif i.text.lower() == 'one' and (i.pos_ == 'PRON' or i.dep_ != 'nummod'):
+                        pass
+                    else:
+                        erroneous.append([find_span([i, i.head]), 'uncount_count_sg'])
+                elif i.text.lower() in count_pl and 'Sing' in i.head.morph.get("Number") \
+                        and i.head.pos_ == 'NOUN':
+                    erroneous.append([find_span([i, i.head]), 'count_pl'])
+                elif i.text.lower() in uncount_count_pl and 'Sing' in i.head.morph.get("Number") \
+                        and i.head.text.lower() not in unc_list and 'NOUN' in i.head.pos_:
+                    erroneous.append([find_span([i, i.head]), 'enough'])
+            elif i.text.lower() in quantifiers_of:
+                for child in i.children:
+                    if child.text.lower() == 'of':
+                        for c in child.children:
+                            if c.pos_ == 'NOUN':
+                                if 'Sing' in c.morph.get("Number")[0] and i.text.lower() in count_pl_of:
+                                    erroneous.append([find_span([i, c]), 'count_pl_of'])
+                                elif 'Sing' in c.morph.get("Number")[0] and i.text.lower() in uncount_count_pl_of \
+                                        and c.text not in unc_list:
+                                    erroneous.append([find_span([i, c]), 'count_pl_of'])
+                                elif 'Plur' in c.morph.get("Number")[0] and i.text.lower() in uncount_of:
+                                    erroneous.append([find_span([i, c]), 'uncount_of'])
+                            elif 'ADJ' in [str(x.pos_) for x in child.children]:
+                                if i.text.lower() in uncount_of:
+                                    erroneous.append([find_span([i, c]), 'uncount_of'])
+            elif i.text.lower() in count_sg_pl_quantified:
+                if 'NUM' not in [str(x.pos_) for x in i.head.children] \
+                        and 'few' not in [str(x).lower() for x in i.head.children]:
+                    if 'Plur' in i.head.morph.get("Number"):
+                        erroneous.append([find_span([i, i.head]), 'count_sg_pl_quantified'])
+            elif i.text.lower() == 'either' or i.text.lower() == 'neither':
+                if 'or' not in [str(x).lower() for x in i.head.children] \
+                        and 'nor' not in [str(x).lower() for x in i.head.children]:
+                    if 'Plur' in i.head.morph.get("Number"):
+                        erroneous.append([find_span([i, i.head]), 'either/neither'])
+            elif i.text.lower() == 'both':
+                children_second_level = []
+                if 'and' not in [str(x).lower() for x in i.head.children] \
+                        and 'ADP' not in [x.pos_ for x in i.children]:
+                    for child in i.head.children:
+                        children_second_level.append([str(x).lower() for x in child.children])
+                    if 'and' in [item for sublist in children_second_level for item in sublist]:
+                        pass
+                    else:
+                        if 'Sing' in i.head.morph.get("Number") and \
+                                (i.head.pos_ == 'NOUN' or i.head.pos_ == 'PRON'):
+                            if [find_span([i, i.head]), 'both'] not in erroneous:
+                                erroneous.append([find_span([i, i.head]), 'both'])
+            elif i.text.lower() in count_pl_special and i.dep_ == 'det':
+                if i.head.text.lower() != 'kind' and i.head.text.lower() != 'type' \
+                        and i.head.text.lower() != 'sort':
+                    if 'Sing' in i.head.morph.get("Number"):
+                        erroneous.append([find_span([i, i.head]), 'count_pl_special'])
+            elif i.pos_ == "NUM" and i.text.lower() != "one" and i.text != "1" \
+                    and (i.head.pos_ == "NOUN" or i.head.pos_ == "ADJ"):
+                if re.match(r'hundreds|thousands|millions|billions|zillions', i.head.text.lower()):
+                    erroneous.append([find_span([i, i.head]), 'numerals'])
+        return erroneous
     def polarity(sentence):
         # Checks if any polarity items were used in the wrong context
 
@@ -713,6 +763,6 @@ def generate_text(text):
 #     for t in d:
 #         print(t, t.head, t.dep_, t.tag_, t.pos_, t._.tree_tag)
 #
-print(generate_text('If I am there, there wouldn\'t be..'))
+# print(generate_text('If I am there, there wouldn\'t be..'))
 # 12 % nummod CD NUM CRD
 # sixteen percent nummod CD NUM CRD
