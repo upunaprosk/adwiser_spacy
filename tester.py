@@ -68,7 +68,7 @@ def tester(function, test_all=False):
         # counter = 0
         # for sentence in all_sentences:
         for sentences in tqdm.tqdm(all_sentences):
-            if found > 500:
+            if found > 1000:
                 break
             for sentence in sentences.split('\n'):
                 # print(sentence)

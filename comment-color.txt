@@ -1,5 +1,16 @@
 Comment,HEX,Number
 
+uncount_of,#ff8c00,1
+count_sg_pl_quantified,#ff8c00,1
+uncount_count_sg,#ff8c00,1
+count_pl,#ff8c00,1
+enough,#ff8c00,1
+count_pl_of,#ff8c00,1
+count_sg_pl_quantified,#ff8c00,1
+either/neither,#ff8c00,1
+both,#ff8c00,1
+count_pl_special,#ff8c00,1
+numerals,#ff8c00,1
 Present Perfect does not go along with indication of time,#DC143C,1
 You may need inverted word order here,#DC143C,1
 You may have used the wrong word order,#DC143C,1

@@ -64,7 +64,7 @@ def without_child(token, values):
     return True
 
 
-def models(text, test_mode=False):
+def models(text, test_mode=False):# ["pp_time"]
     def pp_time(sent):
 
         errors_pp = []
@@ -575,8 +575,10 @@ def models(text, test_mode=False):
                 if (i.text.lower() in uncount or i.text.lower() in uncount_count_sg) \
                         and 'Plur' in i.head.morph.get("Number") and i.head.pos_ == 'NOUN':
                     if i.text.lower() == 'that' and (i.pos_ == 'SCONJ' or i.dep_ != 'det'):
+                        # mark
                         pass
                     elif i.text.lower() == 'one' and (i.pos_ == 'PRON' or i.dep_ != 'nummod'):
+
                         pass
                     else:
                         erroneous.append([find_span([i, i.head]), 'uncount_count_sg'])
@@ -755,14 +757,13 @@ def generate_text(text):
 
 
 #
-#
-# nlp = spacy.load("en_core_web_lg")
-# text_ = 'I have been a student last summer.'
-# doc_ = nlp(text_)
-# for d in doc_.sents:
-#     for t in d:
-#         print(t, t.head, t.dep_, t.tag_, t.pos_, t._.tree_tag)
-#
+# nlp = spacy.load("en_core_web_sm")
+text_ = 'The number of cheese in my fridge is large.'
+doc_ = nlp(text_)
+for d in doc_.sents:
+    for t in d:
+        print(t, t.head, t.dep_, t.tag_, t.pos_)
+print(models(text_, test_mode=["quantifiers"]))
 # print(generate_text('If I am there, there wouldn\'t be..'))
 # 12 % nummod CD NUM CRD
 # sixteen percent nummod CD NUM CRD
