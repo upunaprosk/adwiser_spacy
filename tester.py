@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore")
 from models import models
-
+import tqdm
 import pandas as pd
 
 # from models_old_adwiser import models_old
@@ -55,7 +55,7 @@ def tester(function, test_all=False):
                                      True -  input = data/all_realec.txt
     """
     functions_to_test = [function]
-    result = pd.DataFrame(columns=['sentence', 'found_error'])
+    result = pd.DataFrame(columns=['sentence', 'found_error', 'comment'])
     if not test_all:
         file = function
     else:
@@ -65,10 +65,11 @@ def tester(function, test_all=False):
     txt_result = open('results/' + f'{function}{str(int(test_all))}' + '.txt', 'w', encoding='utf-8')
     with open('data/' + f'{file}.txt', encoding="utf-8") as file:
         all_sentences = file.readlines()
-        counter = 0
+        # counter = 0
         # for sentence in all_sentences:
-        for sentences in all_sentences[:16000]:
-
+        for sentences in tqdm.tqdm(all_sentences):
+            if found > 500:
+                break
             for sentence in sentences.split('\n'):
                 # print(sentence)
                 if sentence:
@@ -80,27 +81,32 @@ def tester(function, test_all=False):
                         found_sentences = sentence
                         if found: found_sentences += '\n';
                         if found <= 15:
-                            print(sentence)
+                            print('\n' + sentence)
                         txt_result.write(found_sentences)
-                        result.loc[result.shape[0] + 1, 'sentence'] = str(sentence)
-                        result.loc[result.shape[0] + 1, 'found_error'] = str(errs)
-                    counter += 1
-                    if not counter % 100: print('Processed:', counter);
+                        for i in range(len(errs[0])):
+
+                            result.loc[result.shape[0] + 1, 'sentence'] = str(sentence).rstrip()
+                            result.loc[result.shape[0], 'found_error'] = sentence[errs[0][i][0][0]:errs[0][i][0][-1]]
+                            result.loc[result.shape[0], 'comment'] = errs[0][i][-1]
+
+                    # counter += 1
+                    # if not counter % 100: print('Processed:', counter);
     txt_result.close()
     if found:
-        result.to_excel('results/' + f'{function}{str(int(test_all))}' + '.xlsx')
+        result.to_excel('results/' + f'{function}{str(int(test_all))}' + '.xlsx', index=False)
     if not test_all:
         print(f'Found: {found} out of {out_of}')
     return
 
-
+tester('quantifiers', test_all=True)
 # tester - принимает строковое название функции function (можно несколько)
-# и bool переменную (True при отлавливании ошибок на всех предложениях,
+# bool переменную (True при отлавливании ошибок на всех предложениях,
 # False - файле data/function.txt (для собственно-придуманных примеров)
 # Результат - записывается в папку results/function.xlsx
 
 # observed_functions = {past_cont, redundant_comma, hardly, that_comma,
-#                       pp_time, only, inversion, extra_inversion, spelling, conditionals, quantifiers}
+#                       pp_time, only, inversion, extra_inversion, spelling, conditionals,
+#                       quantifiers}
 # Доступные функции для теста в множестве выше
-for x in {'inversion'}:
-    tester(x, True)
+# for x in {'consider_that'}:
+#     tester(x, True)
