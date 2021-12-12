@@ -65,10 +65,10 @@ def tester(function, test_all=False):
     txt_result = open('results/' + f'{function}{str(int(test_all))}' + '.txt', 'w', encoding='utf-8')
     with open('data/' + f'{file}.txt', encoding="utf-8") as file:
         all_sentences = file.readlines()
-        # counter = 0
+        counter = 0
         # for sentence in all_sentences:
         for sentences in tqdm.tqdm(all_sentences):
-            if found > 1000:
+            if found > 1000 or counter > 100000:
                 break
             for sentence in sentences.split('\n'):
                 # print(sentence)
@@ -89,7 +89,7 @@ def tester(function, test_all=False):
                             result.loc[result.shape[0], 'found_error'] = sentence[errs[0][i][0][0]:errs[0][i][0][-1]]
                             result.loc[result.shape[0], 'comment'] = errs[0][i][-1]
 
-                    # counter += 1
+                    counter += 1
                     # if not counter % 100: print('Processed:', counter);
     txt_result.close()
     if found:
@@ -98,7 +98,6 @@ def tester(function, test_all=False):
         print(f'Found: {found} out of {out_of}')
     return
 
-tester('quantifiers', test_all=True)
 # tester - принимает строковое название функции function (можно несколько)
 # bool переменную (True при отлавливании ошибок на всех предложениях,
 # False - файле data/function.txt (для собственно-придуманных примеров)

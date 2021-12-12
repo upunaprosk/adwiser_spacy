@@ -1,5 +1,6 @@
 # import warnings
 # warnings.filterwarnings("ignore")
+# import treetaggerwrapper
 import re
 import spacy
 from spacy.tokens import Token
@@ -7,7 +8,6 @@ from annotator import output_maker
 from spacy.matcher import DependencyMatcher
 from spacy.matcher import Matcher
 from spellchecker import SpellChecker
-# import treetaggerwrapper
 
 nlp = spacy.load("en_core_web_sm")
 # tagger = treetaggerwrapper.TreeTagger(TAGLANG='en', TAGDIR='tt/')
@@ -340,12 +340,12 @@ def models(text, test_mode=False):# ["pp_time"]
         spell = SpellChecker()
         errors = []
         for token in sent:
-            if len(token.text) <4:continue;
+            if len(token.text) < 4 or token.text[0].isupper():continue;
             if str(spell.correction(token.text)) != str(token.text):
                 candidates = "/".join(spell.candidates(token.text))
                 errors.append([find_span([token]),
                                f'You might have misspelled that word, possible '
-                               f'correction: {candidates}.'])
+                               f'corrections: {candidates}.'])
         return errors
 
     def hardly(sent):
@@ -455,7 +455,6 @@ def models(text, test_mode=False):# ["pp_time"]
         if error_that(sent):
             found_subj = [token.i for token in sent if 'subj' in str(token.dep_)]
             found_subj.sort()
-            found_subj = found_subj[0]
             errors = []
             for match in error_that(sent):
                 that = sent[match[1][-1]]
@@ -503,10 +502,11 @@ def models(text, test_mode=False):# ["pp_time"]
 
     def past_cont(sent):
         p_cont = [{'RIGHT_ID': 'vbg', 'RIGHT_ATTRS': {'TAG': 'VBG'}},
-                  {'LEFT_ID': 'vbg', 'REL_OP': '>', 'RIGHT_ID': 'was', 'RIGHT_ATTRS': {'DEP': 'aux', 'TAG': 'VBD'}}]
+                  {'LEFT_ID': 'vbg', 'REL_OP': '>', 'RIGHT_ID': 'was', 'RIGHT_ATTRS': {'DEP': 'aux', 'TAG': 'VBD', 'ORTH': {'IN': ['was', 'were']}}}]
         error_clause = DependencyMatcher(vocab=nlp.vocab)
         error_clause.add('p_cont', [p_cont])
         for match in error_clause(sent):
+
             verb = sent[match[1][0]]
             errors = []
             if without_child(verb, {'dep_': 'advmod', 'tag_': 'RB'}):
@@ -520,6 +520,7 @@ def models(text, test_mode=False):# ["pp_time"]
                 # TODO always/never/forever/constantly/permanently/eternally  | for ever
                 # Исключения: every ..
                 if not while_ or errors:
+
                     errors.append([find_span([sent[match[1][1]], sent[match[1][0]]]),
                                    'The usage of Past Continuous might be erroneous.'])
 
@@ -756,14 +757,10 @@ def generate_text(text):
     return annotated_text, comments
 
 
-#
 # nlp = spacy.load("en_core_web_sm")
-text_ = 'The number of cheese in my fridge is large.'
-doc_ = nlp(text_)
-for d in doc_.sents:
-    for t in d:
-        print(t, t.head, t.dep_, t.tag_, t.pos_)
-print(models(text_, test_mode=["quantifiers"]))
-# print(generate_text('If I am there, there wouldn\'t be..'))
-# 12 % nummod CD NUM CRD
-# sixteen percent nummod CD NUM CRD
+# text_ = 'The number of cheese in my fridge is large.'
+# doc_ = nlp(text_)
+# for d in doc_.sents:
+#     for t in d:
+#         print(t, t.head, t.dep_, t.tag_, t.pos_)
+# print(models(text_, test_mode=["quantifiers"]))

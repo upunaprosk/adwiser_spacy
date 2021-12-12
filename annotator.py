@@ -1,19 +1,3 @@
-# 'You may have used a redundant comma in front of this conjunction.' \
-# 'The usage of Past Continuous might be erroneous.'
-# 'With such construction of the main clause, the next' \
-# 'In if-clauses talking about unreal conditions, Past Simple or Past Perfect are expected.'
-# 'Past Perfect should be used in the main clause.'    \
-# 'Past Simple should be used in this clause.'   \
-# 'Present Perfect does not go along with indication of time in the past.' \
-# 'You may need inverted word order here.' 'You may need inverted word order here.' \
-# 'You may need standard word order here.' 'You might have misspelled that word, possible '
-# 'In if-clauses talking about future, Present Simple or Present Perfect are expected' \
-# 'You may have used a redundant comma' \
-# 'Instead of the comma, semicolon has to be used in
-#
-# 'You may have wrongly used the verb CONSIDER with THAT.' \
-# 'That might be an erroneous use of quantifiers'
-
 import csv
 def output_maker(data, all_errors):
     def find_color(comment_string):
