@@ -8,12 +8,12 @@ from annotator import output_maker
 from spacy.matcher import DependencyMatcher
 from spacy.matcher import Matcher
 from spellchecker import SpellChecker
-
+from spacy.matcher import PhraseMatcher
+import json
 nlp = spacy.load("en_core_web_sm")
 # tagger = treetaggerwrapper.TreeTagger(TAGLANG='en', TAGDIR='tt/')
 char_span = lambda token: (token.idx, token.idx + len(token.text))
 Token.set_extension(name='span', getter=char_span)
-
 
 #
 # def tree_tag_(token):
@@ -22,11 +22,8 @@ Token.set_extension(name='span', getter=char_span)
 #     tags_ = tags_[token.i]
 #     _, tag, _ = tags_.split('\t')
 #     return tag
-#
-#
 # tree_tag = lambda token: tree_tag_(token)
 # Token.set_extension(name='tree_tag', getter=tree_tag)
-
 
 def find_span(tokens):
     if len(tokens) == 1:
@@ -57,20 +54,21 @@ def without_child(token, values):
         construct_pattern += temp
     construct_pattern = construct_pattern[:-5] + ']'
     try:
-        flag = exec(construct_pattern)
+        flag = eval(construct_pattern)
         if flag: return False
     except:
+
         raise KeyError(f'Invalid key')
     return True
 
 
-def models(text, test_mode=False):# ["pp_time"]
+def models(text, test_mode=False):  # ["pp_time"]
     def pp_time(sent):
 
         errors_pp = []
         all_errors = []
         dep_matcher = DependencyMatcher(vocab=nlp.vocab)
-        present_perfect = [{'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'TAG': 'VBN'}},
+        present_perfect = [{'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'TAG': 'VBN', 'LEMMA': {'NOT_IN': ['get']}}},
                            {'LEFT_ID': 'verb', 'REL_OP': '>', 'RIGHT_ID': 'have',
                             'RIGHT_ATTRS': {'LEMMA': 'have', 'DEP': 'aux', 'TAG': {'IN': ['VBP', 'VBZ']}}}]
         dep_matcher.add("present_perfect", patterns=[present_perfect])
@@ -86,20 +84,20 @@ def models(text, test_mode=False):# ["pp_time"]
             patt_one = [{'RIGHT_ID': 'prep', 'RIGHT_ATTRS':
                 {'LEMMA': {'IN': ['from', 'in', 'over', 'between']}}},
                         {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'year',
-                         'RIGHT_ATTRS': {'TAG': 'CD', 'DEP': 'pobj'}}]
+                         'RIGHT_ATTRS': {'TAG': 'CD', 'DEP': 'pobj', 'lemma': {'NOT_IN': ['one']}}}]
 
             dep_matcher_.add('prep+cd', patterns=[patt_one])
             dep_matches = dep_matcher_(sent)
 
-            # + у последнего нет детей с леммой recent/last
-            if dep_matches and without_child(sent[dep_matches[0][1][1]], {'lemma_': ['last', 'recent']}):
+            # not recent/last
+            if dep_matches and without_child(sent[dep_matches[0][1][1]].head, {'lemma_': ['last', 'recent']}):
                 all_matches.append(dep_matches[0][1][0])
                 if sent[dep_matches[0][1][0]].head.tag_ == 'VBN':
                     verbs.append(sent[dep_matches[0][1][0]].head)
             # in/from/over/between+year
             patt_two = [{'RIGHT_ID': 'prep', 'RIGHT_ATTRS': {'LEMMA': {'IN': ['at', 'over', 'in']}}},
                         {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'year',
-                         'RIGHT_ATTRS': {'LEMMA': 'year', 'DEP': 'pobj'}}]
+                         'RIGHT_ATTRS': {'TAG': 'NN', 'LEMMA': 'year', 'DEP': 'pobj'}}]
 
             dep_matcher_.add('prep+year', patterns=[patt_two])
             # at/in/over + last/recent + NN
@@ -107,13 +105,17 @@ def models(text, test_mode=False):# ["pp_time"]
                           {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun',
                            'RIGHT_ATTRS': {'TAG': 'NN', 'DEP': {'IN': ['pobj', 'npadvmod']}}},
                           {'LEFT_ID': 'noun', 'REL_OP': '>', 'RIGHT_ID': 'adj',
-                           'RIGHT_ATTRS': {'LEMMA': {'IN': ['last', 'initial']}}}]
+                           'RIGHT_ATTRS': {'ORTH': {'IN': ['last', 'initial']}}}]
 
             dep_matcher_.add('prep+noun+last/initial', patterns=[patt_three])
             # at/in/over + ordinal + NN
             patt_four = [{'RIGHT_ID': 'prep', 'RIGHT_ATTRS': {'LEMMA': {'IN': ['at', 'over', 'in']}}},
                          {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun',
-                          'RIGHT_ATTRS': {'TAG': 'NN', 'DEP': {'IN': ['pobj', 'npadvmod']}}},
+                          'RIGHT_ATTRS': {'TAG': 'NN', 'DEP': {'IN': ['pobj', 'npadvmod']}, 'LEMMA':
+                              {'IN': ['year', 'term', 'week', 'semester', 'century'
+                                                                          'day', 'month', 'decade', 'spring', 'fall',
+                                      'autumn', 'winter', 'summer', 'night', 'evening',
+                                      'morning', 'season', 'stage', 'point', 'phase']}}},
                          {'LEFT_ID': 'noun', 'REL_OP': '>', 'RIGHT_ID': 'ord_adj',
                           'RIGHT_ATTRS': {'ENT_TYPE': 'ORDINAL'}}]
 
@@ -153,6 +155,9 @@ def models(text, test_mode=False):# ["pp_time"]
             # Verbs
             if dep_matcher_(sent):
                 for match_dep in dep_matcher_(sent):
+                    if nlp.vocab[match_dep[0]].text == 'prep+noun+last/initial' and not \
+                            without_child(sent[match_dep[1][-1]].head, {'lemma_': 'the'}):
+                        continue
                     if sent[match_dep[1][0]].head.tag_ == 'VBN':
                         verbs.append(sent[match_dep[1][0]].head)
                     if nlp.vocab[match_dep[0]].text == 'since_1998_to_2000':
@@ -160,9 +165,9 @@ def models(text, test_mode=False):# ["pp_time"]
                             tok = sent[match_dep[1][1]]
                             all_errors.append([find_span([tok]),
                                                'You may need \'from\' instead of \'since\'.'])
-
-            # have + not от каждого глагола + ошибки
             for verb in verbs:
+                if not without_child(verb, {'lemma_': 'during'}):
+                    continue
                 if verb.tag_ == 'VBN':
 
                     have_not = [have for have in verb.children if have.lemma_ == 'have' and have.dep_ == 'aux'
@@ -177,28 +182,29 @@ def models(text, test_mode=False):# ["pp_time"]
         return all_errors
 
     def inversion(sent):
-
         error_message = 'You may need inverted word order here.'
 
         def find_wrong_order(token_i):
 
             possible_inversions = {'barely', 'never', 'rarely', 'seldom',
                                    'scarcely', 'nowhere', 'neither', 'nor'}
-            if token_i.lemma_ in possible_inversions and not re.search(r'^Never the', token.sent.text):
+            if token.i >= len(token.sent) - 1:
+                return False
+            if token_i.lemma_ in possible_inversions and not re.search(r'^Never the', token_i.sent.text):
                 return True
-            elif token_i.lemma_ in {'hardly', 'not'} and token.sent[token.i + 1].pos_ != 'NOUN':
+            elif token_i.lemma_ in {'hardly'} and token.sent[token.i + 1].pos_ not in ['NOUN', 'PRON']:
                 return True
             elif token_i.lemma_ == 'little' and token_i.dep_ in {'npadvmod', 'dobj', 'advmod'}:
                 if without_child(token_i, {'lemma_': 'by'}):
                     return True
-            elif token_i.lemma_ == 'not':
-                flag = [i for i in token_i.children if i.lemma_ in {'only', 'until'}]
+            elif token_i.lemma_ == 'not' and token_i.dep_ == 'preconj' and token.sent[token.i + 1].pos_ not in ['NOUN', 'PRON']:
+                flag = [i for i in token_i.children if i.lemma_ in {'only', 'since'}]
                 if flag:
                     return True
 
             return False
 
-        for token in sent:  # for future modifications (for several clauses in a sent)
+        for token in sent:
             flag = False
             if not (token.i - sent.start):
                 prep_no_noun = [{'RIGHT_ID': 'prep',
@@ -223,7 +229,7 @@ def models(text, test_mode=False):# ["pp_time"]
 
                 if flag:
 
-                    verb = token.head if token.head.pos_ == 'AUX' else ''
+                    verb = token.head if token.head.pos_ == 'AUX' or token.head.pos_ == 'VERB' else ''
                     if not verb:
                         aux = [v for v in token.head.children if v.pos_ == 'AUX']
                         verb_ = token.head if token.head.pos_ == 'VERB' else ''
@@ -238,7 +244,12 @@ def models(text, test_mode=False):# ["pp_time"]
                         elif verb2_:
                             verb = verb2_
 
+                    if not isinstance(verb, str) and verb.pos_ == 'VERB':
+                        aux_s = [v for v in token.head.head.children if v.pos_ == 'AUX']
+                        if aux_s:
+                            verb = aux_s[0]
                     if verb:
+
                         noun = [noun for noun in token.head.children if noun.dep_ in {'nsubj', 'nsubjpass'}]
                         noun = noun or [noun for noun in token.head.head.children if
                                         noun.dep_ in {'nsubj', 'nsubjpass'}]
@@ -253,60 +264,124 @@ def models(text, test_mode=False):# ["pp_time"]
             break
         return
 
-    def only(sent):
-
+    def inversion(sent):
         error_message = 'You may need inverted word order here.'
 
-        only_1 = [{'RIGHT_ID': 'only', 'RIGHT_ATTRS': {'LEMMA': 'only', 'DEP': 'advmod'}},
-                  {'LEFT_ID': 'only', 'REL_OP': '<', 'RIGHT_ID': 'advcl', 'RIGHT_ATTRS': {'TAG': 'WRB'}},
-                  {'LEFT_ID': 'advcl', 'REL_OP': '$++', 'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'DEP': 'ccomp'}},
-                  {'LEFT_ID': 'verb', 'REL_OP': '>', 'RIGHT_ID': 'noun',
-                   'RIGHT_ATTRS': {'DEP': {'IN': ['nsubj', 'nsubjpass']}}}]
+        def find_wrong_order(token_i):
 
-        only_1_2 = [{'RIGHT_ID': 'only', 'RIGHT_ATTRS': {'LEMMA': 'only', 'DEP': 'advmod'}},
-                    {'LEFT_ID': 'only', 'REL_OP': '<<', 'RIGHT_ID': 'advcl', 'RIGHT_ATTRS': {'DEP': 'advcl'}},
-                    {'LEFT_ID': 'advcl', 'REL_OP': '<', 'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'POS': 'VERB'}},
-                    {'LEFT_ID': 'verb', 'REL_OP': '>', 'RIGHT_ID': 'noun',
-                     'RIGHT_ATTRS': {'DEP': {'IN': ['nsubj', 'nsubjpass']}}}]
+            possible_inversions = {'barely', 'never', 'rarely', 'seldom',
+                                   'scarcely', 'nowhere', 'neither', 'nor'}
+            if token_i.lemma_ in possible_inversions and not re.search(r'^Never the', token_i.sent.text):
+                return True
+            elif token_i.lemma_ in {'hardly'} and token.sent[token.i + 1].pos_ not in ['NOUN', 'PRON']:
+                if token_i.head.pos_ != 'VERB':
+                    return True
+            elif token_i.lemma_ == 'little' and token_i.dep_ in {'npadvmod', 'dobj', 'advmod'}:
+                if without_child(token_i, {'lemma_': 'by'}):
+                    return True
+            elif token_i.lemma_ == 'not' and token_i.dep_ == 'preconj':
+                if token_i.head.pos_ in ['NOUN', 'PRON']:
+                    return False
+                flag = [i for i in token_i.children if i.lemma_ in {'only', 'since'}]
+                if flag:
+                    return True
+            elif token_i.lemma_ == 'only':
+                # only + then/since/later/once
+                flag = True if token_i.head.orth_ in {'then', 'since', 'later', 'once', 'in', 'by', 'with'} else False
+                if flag:
+                    return True
+            return False
 
+        for token in sent[:2]:
+            flag = False
+            if not (token.i - sent.start):
+                prep_no_noun = [{'RIGHT_ID': 'prep',
+                                 'RIGHT_ATTRS': {'LEMMA': {'IN': ['under', 'in', 'over', 'at', 'for', 'to']},
+                                                 'TAG': 'IN'}},
+                                {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun', 'RIGHT_ID': 'noun',
+                                 'RIGHT_ATTRS': {'POS': 'NOUN'}},
+                                {'LEFT_ID': 'noun', 'REL_OP': '>', 'RIGHT_ID': 'no', 'RIGHT_ATTRS': {'LEMMA': 'no'}}]
+                no_sooner = [{'RIGHT_ID': 'no', 'RIGHT_ATTRS': {'LEMMA': 'no', 'DEP': 'neg'}},
+                             {'LEFT_ID': 'no', 'REL_OP': '<', 'RIGHT_ID': 'noun',
+                              'RIGHT_ATTRS': {'LEMMA': {'IN': ['soon', 'later']}}}]
+                dep_matcher_ = DependencyMatcher(vocab=nlp.vocab)
+                dep_matcher_.add('inversions', patterns=[prep_no_noun, no_sooner])
+                for match_dep in dep_matcher_(sent):
+                    if sent[match_dep[1][0]].i == token.i:
+                        flag = True
+                        del dep_matcher_
+                        break
+                if not flag:
+                    try:
+                        flag = find_wrong_order(token)
+                    except:
+                        continue
+                if flag:
+                    verb = token.head if token.head.pos_ == 'AUX' or token.head.pos_ == 'VERB' else ''
+                    if not verb:
+                        aux = [v for v in token.head.children if v.pos_ == 'AUX']
+                        verb_ = token.head if token.head.pos_ == 'VERB' else ''
+                        aux_s = [v for v in token.head.head.children if v.pos_ == 'AUX']
+                        verb2_ = token.head.head if token.head.head.pos_ == 'VERB' else ''
+                        if aux:
+                            verb = aux[0]
+                        elif aux_s:
+                            verb = aux_s[0]
+                        elif verb_:
+                            verb = verb_
+                        elif verb2_:
+                            verb = verb2_
+                    if not isinstance(verb, str) and verb.pos_ == 'VERB':
+                        aux_s = [v for v in token.head.head.children if v.pos_ == 'AUX']
+                        if aux_s:
+                            verb = aux_s[0]
+                    if verb:
+                        noun = [noun for noun in token.head.children if noun.dep_ in {'nsubj', 'nsubjpass'}]
+                        noun = noun or [noun for noun in token.head.head.children if
+                                        noun.dep_ in {'nsubj', 'nsubjpass'}]
+                        if noun:
+                            wrong_order = True if verb.i > noun[0].i else False
+                            if wrong_order:
+                                errors = []
+                                errors.append([find_span([verb]), error_message])
+                                return errors
+            break
+        return
+
+    def only(sent):
+        error_message = 'You may need inverted word order here.'
+        # inverted order is needed in the second clause
+        only_ = [{'RIGHT_ID': 'only', 'RIGHT_ATTRS': {'LEMMA': 'only', 'DEP': 'advmod'}},
+                 {'LEFT_ID': 'only', 'REL_OP': '<', 'RIGHT_ID': 'advcl', 'RIGHT_ATTRS':
+                     {'POS': {'IN': ['AUX', 'VERB']}, 'DEP': 'advcl'}},
+                 {'LEFT_ID': 'advcl', 'REL_OP': '>', 'RIGHT_ID': 'when_if', 'RIGHT_ATTRS':
+                     {'LEMMA': {'IN': ['when', 'if', 'after']}}},
+                 {'LEFT_ID': 'advcl', 'REL_OP': '<', 'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'DEP': 'ROOT'}}]
+        not_until = [{'RIGHT_ID': 'not', 'RIGHT_ATTRS': {'LEMMA': 'not', 'DEP': 'neg'}},
+                     {'LEFT_ID': 'not', 'REL_OP': '<', 'RIGHT_ID': 'advcl', 'RIGHT_ATTRS':
+                         {'POS': {'IN': ['AUX', 'VERB']}, 'DEP': 'advcl'}},
+                     {'LEFT_ID': 'advcl', 'REL_OP': '>', 'RIGHT_ID': 'until', 'RIGHT_ATTRS': {'LEMMA': 'until'}},
+                     {'LEFT_ID': 'advcl', 'REL_OP': '<', 'RIGHT_ID': 'verb',
+                      'RIGHT_ATTRS': {'DEP': 'ROOT'}}]
         dep_matcher_ = DependencyMatcher(vocab=nlp.vocab)
-        dep_matcher_.add('only_1', patterns=[only_1, only_1_2])
-
-        verb_start = None
-        noun = None
+        dep_matcher_.add('only_not_until', patterns=[only_, not_until])
         if dep_matcher_(sent):
-
-            if not sent[dep_matcher_(sent)[0][1][0]].i - sent.start:
-                verb_start = sent[dep_matcher_(sent)[0][1][-2]]
-                noun = sent[dep_matcher_(sent)[0][1][-1]]
-            for child in sent[dep_matcher_(sent)[0][1][0]].head.children:
-                if sent[dep_matcher_(sent)[0][1][0]].head.dep_ == 'nummod' or \
-                        not without_child(child, {'dep_': 'prep', 'lemma_': 'of'}):
-                    verb_start = ''
-
-                    break
-        elif sent[0].lemma_ == 'only' and sent[0].dep_ == 'advmod':
-            if sent[0].head.dep_ != 'nummod':
-                verbs = {}
-                matcher_only = Matcher(vocab=nlp.vocab)
-                matcher_only.add('verb', patterns=[[{'POS': 'VERB'}]])
-                if len(matcher_only(sent)) == 1:
-                    verb_start = sent[matcher_only(sent)[0][1]]
-                    noun = [n for n in verb_start.children if n.dep_ in ['nsubj', 'nsubjpass']]
-                    if noun:
-                        noun = noun[0]
-            if noun and verb_start:
-                aux_ = [aux for aux in verb_start.children if aux.pos_ == 'AUX']
-                if aux_:
-                    verb_start = aux_[0]
-                if verb_start.i > noun.i:
-                    err = [[find_span([verb_start]), error_message]]
-                    return err
+            if sent[dep_matcher_(sent)[0][1][0]].head.pos_ in ['NOUN', 'PRON']:
+                return []
+            verb = sent[dep_matcher_(sent)[0][1][-1]]
+            aux_s = [i for i in verb.children if i.dep_ == 'aux']
+            noun = [n for n in verb.children if n.dep_ in ['nsubj', 'nsubjpass']]
+            if noun:
+                noun = noun[0]
+                if aux_s:
+                    verb = aux_s[0]
+                if noun.i < verb.i:
+                    del dep_matcher_;
+                    return [[find_span([verb]), error_message]]
         return
 
     def extra_inversion(sent):
-
-        error_message = 'You may have used the wrong word order'
+        error_message = 'You may have used the wrong word order.'
         if '"' not in sent.text and '"' not in sent.text:
             dep_matcher_ = DependencyMatcher(vocab=nlp.vocab)
             ccomp_ = [{'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'DEP': 'ROOT'}},
@@ -332,24 +407,24 @@ def models(text, test_mode=False):# ["pp_time"]
                     aux = [i for i in ccomp_verb.children if i.pos_ == 'AUX']
                     if noun and aux:
                         if aux[0].i < noun[0].i:
-                            words = [sent[k] for k in range(aux[0].i, noun[0].i + 1)]
-                            return ([find_span(words), error_message])
+                            words = [sent[k] for k in range(aux[0].i - sent.start, noun[0].i + 1 - sent.start)]
+                            return [[find_span(words), error_message]]
             return
 
     def spelling(sent):
         spell = SpellChecker()
         errors = []
         for token in sent:
-            if len(token.text) < 4 or token.text[0].isupper():continue;
+            if len(token.text) < 4 or token.text[0].isupper(): continue;
             if str(spell.correction(token.text)) != str(token.text):
-                candidates = "/".join(spell.candidates(token.text))
+                candidates_l = list(spell.candidates(token.text))[:5]
+                candidates = "/".join(candidates_l)
                 errors.append([find_span([token]),
                                f'You might have misspelled that word, possible '
                                f'corrections: {candidates}.'])
         return errors
 
     def hardly(sent):
-
         hardly = [
             {'RIGHT_ID': 'hardly', 'RIGHT_ATTRS': {'DEP': 'advmod', 'LEMMA': {'IN': ['hardly', 'scarcely', 'barely']}}},
             {'LEFT_ID': 'hardly', 'REL_OP': '<', 'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'POS': 'VERB'}}]
@@ -358,7 +433,6 @@ def models(text, test_mode=False):# ["pp_time"]
                      {'LEFT_ID': 'sooner', 'REL_OP': '<', 'RIGHT_ID': 'verb', 'RIGHT_ATTRS': {'POS': 'VERB'}},
                      {'LEFT_ID': 'sooner', 'REL_OP': '>', 'RIGHT_ID': 'no',
                       'RIGHT_ATTRS': {'DEP': 'neg', 'LEMMA': 'no'}}]
-
         dep_matcher_ = DependencyMatcher(vocab=nlp.vocab)
         dep_matcher_.add('hardly', patterns=[hardly])
         dep_matcher_.add('sooner', patterns=[no_sooner])
@@ -366,25 +440,22 @@ def models(text, test_mode=False):# ["pp_time"]
         if dep_matcher_(sent):
             if not sent[dep_matcher_(sent)[0][1][0]].i - sent.start:
                 matched = nlp.vocab[dep_matcher_(sent)[0][0]]
-
                 root_ = sent.root
                 advcls = [x for x in sent if x.dep_ == 'advcl']
                 if advcls:
-
                     advcl = advcls[0]
                     conj = ''
                     allowed = ''
-                    if matched.text == 'hardly':  # TODO italics comment
+                    if matched.text == 'hardly':
                         conj = [wh for wh in advcl.children if wh.dep_ == 'advmod' and wh.lemma_ in {'when', 'before'}]
                         allowed = '\'when\' or \'before\''
                     else:
-
                         conj = [wh for wh in advcl.children if wh.dep_ == 'mark' and wh.lemma_ == 'than']
                         allowed = 'than'
                     if not conj:
                         hardly = sent[dep_matcher_(sent)[0][1][0]]
                         errors.append([find_span([hardly]),
-                                       f'With such construction of the main clause, the next clause should be introduced with {allowed}.'])
+                                       f'With such a construction of the main clause, the next clause should be introduced with {allowed}.'])
 
                     if not (sent[dep_matcher_(sent)[0][1][0]].tag_ == 'VBN' and [aux for aux in
                                                                                  sent[dep_matcher_(sent)[0][1][
@@ -401,7 +472,6 @@ def models(text, test_mode=False):# ["pp_time"]
             return errors
 
     def conditionals(sent):
-
         if [x for x in sent if x.lemma_ in {'if'}]:
             root = sent.root if sent.root.pos_ == 'VERB' else ''
             if root:
@@ -412,16 +482,13 @@ def models(text, test_mode=False):# ["pp_time"]
                 advcls = [x for x in sent if x.dep_ == 'advcl' and [y for y in x.children if
                                                                     y.lemma_ in {'if'} and y.dep_ == 'mark']]
                 for advcl in advcls:
-
                     ss = 'http://realec-reference.site/viewArticle/CONDITIONAL%20SENTENCES'
                     will_if_clause = [x for x in advcl.children if x.dep_ == 'aux' and x.lemma_ in {'will', 'would'}]
-
                     if will_if_clause:
                         errors.append([find_span([will_if_clause[0]]),
                                        '\'Will\' or \'would\' after \'if\' are not used in conditionals.'])
                     verb = advcl
                     if will:
-
                         have = [have for have in verb.children if
                                 (have.lemma_ == 'have' and have.dep_ == 'aux' and have.tag_ in {'VBP', 'VBZ'})]
                         pres_perfect = True if verb.tag_ == 'VBN' and have else False
@@ -429,25 +496,20 @@ def models(text, test_mode=False):# ["pp_time"]
                         if not (pres_perfect | pres_simple):
                             errors.append([find_span([verb]),
                                            'In if-clauses talking about future, Present Simple or Present Perfect are expected. (More examples: http://realec-reference.site/viewArticle/CONDITIONAL%20SENTENCES )'])
-
                     elif would:
                         past_perfect = True if verb.tag_ == 'VBN' \
                                                and [have for have in verb.children if have.dep_ == 'aux' \
                                                     and have.text == 'had'] else False
                         past_simple = True if verb.tag_ == 'VBD' \
                                               and without_child(verb, {'dep_': 'aux'}) else False
-
                         if not (past_perfect | past_simple):
                             errors.append([find_span([verb]),
                                            r'In if-clauses talking about unreal conditions, Past Simple or '
                                            r'Past Perfect are expected.(More examples: '
                                            r'http://realec-reference.site/viewArticle/CONDITIONAL%20SENTENCES) '])
-
                 return errors
-            # TODO if/provided/providing/unless/on condition/lest
 
     def that_comma(sent):
-
         error_that = DependencyMatcher(vocab=nlp.vocab)
         comma_that = [{'RIGHT_ID': 'comma', 'RIGHT_ATTRS': {"LEMMA": ",", "POS": "PUNCT"}},
                       {'LEFT_ID': 'comma', 'REL_OP': '.', 'RIGHT_ID': 'that', 'RIGHT_ATTRS': {'LEMMA': 'that'}}]
@@ -459,7 +521,7 @@ def models(text, test_mode=False):# ["pp_time"]
             for match in error_that(sent):
                 that = sent[match[1][-1]]
                 if 'subj' in str(that.dep_):
-                    if that.i != found_subj:  # deleting cases as Unfortunately, that
+                    if that.i != found_subj:  # no cases as Unfortunately, that
                         errors.append([find_span([sent[match[1][0]], that]),
                                        'Instead of the comma, semicolon has to be used in front of \'that\'.'])
             first_that = sent[error_that(sent)[0][1][-1]]
@@ -470,24 +532,96 @@ def models(text, test_mode=False):# ["pp_time"]
         return
 
     def punct(sent):
-        # TODO in addition, - однозначный случай / in addition to зависимые от addition
-        pass
+        comment = """A comma seems to be missing."""
+        to = [{'RIGHT_ID': 'to', 'RIGHT_ATTRS': {'LEMMA': 'to', 'DEP': 'aux'}},
+              {'LEFT_ID': 'to', 'REL_OP': '<', 'RIGHT_ID': 'advcl', 'RIGHT_ATTRS':
+                  {'POS': {'IN': ['AUX', 'VERB']}, 'DEP': 'advcl'}}]
+        preps = [{'RIGHT_ID': 'prep', 'RIGHT_ATTRS': {'LEMMA': {'IN': ['in', 'on', 'for', 'from']}, 'DEP': 'prep'}},
+                 {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun', 'RIGHT_ATTRS':
+                     {'POS': 'NOUN', 'LEMMA': {'IN': ['view','viewpoint','perspective','point','instance','example','conclusion','word', 'contrary']}}}]
+
+        all_nouns = []
+        pattern_ = """In conclusion|However|Nevertheless|Consequently||Firstly|Secondly|Thirdly|Moreover|In short|Surprisingly|Unsurprisingly|Hopefully|Interestingly|Obviously| \
+        Thus|Of course|Unexpectedly|Sadly|Luckily|Fortunately|Thankfully|Certainly|Definitely|Doubtless\
+        Finally|Never the less|Honestly|Furthermore|Typically|On one hand|On the other hand"""
+        dep_matcher = DependencyMatcher(vocab=nlp.vocab)
+        dep_matcher.add("to", patterns=[to])
+        dep_matcher.add("prep_phrase", patterns=[preps])
+        errs = []
+        for matched in dep_matcher(sent):
+            first_w = sent[matched[-1][0]].i == sent.start
+            if nlp.vocab[matched[0]].text == 'to' and sent[matched[-1][0]].i != sent.start:
+                break
+            last_word = sent[matched[-1][-1]]
+            child_ = [i for i in last_word.children]
+            child_.append(last_word)
+            if sent[child_[-1].i - sent.start + 1].pos_ == 'PUNCT':
+                if first_w:
+                    continue
+                if sent[child_[-1].i - sent.start - 1].pos_ == 'PUNCT':
+                    continue
+            the_ = [i for i in child_ if i.lemma_ == 'the']
+            flag_wrong = [i for i in child_ if i.dep_ == 'ROOT']
+            if flag_wrong:
+                continue
+            child_extra = []
+            if nlp.vocab[matched[0]].text != 'to':
+                [child_extra.extend(i.children) for i in child_]
+                child_.extend(child_extra)
+            if the_:
+                child_.append(the_[0].head)
+            child_.append(sent[matched[-1][0]])
+            child_.sort(key=lambda x: x.i)
+            flag_after_er = False
+            flag_before_er = False
+            if sent[child_[-1].i-sent.start].pos_ != 'PUNCT' and sent[child_[-1].i-sent.start + 1].pos_ != 'PUNCT' and sent[child_[-1].i-sent.start + 2].pos_ != 'PUNCT':
+                flag_after_er = True
+            if child_[0].i != sent.start and child_[0].i !=0:
+                if sent[child_[0].i-sent.start - 1].pos_ != 'PUNCT':
+                    flag_before_er = True
+            if flag_after_er or flag_before_er:
+                errs.append([find_span(child_),
+                           comment])
+                return errs
+        for p in pattern_.split('|'):
+            matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
+            matcher.add("intro_phrase", [nlp(p)])
+            matches = matcher(sent)
+            if matches:
+                for m in matches:
+                    if sent[m[1]-sent.start].i != sent.start: continue;
+                    child_ = []
+                    [child_.append(sent[x]) for x in range(m[-2]-sent.start, m[-1]-sent.start)]
+                    child_.sort(key=lambda x: x.i)
+                    flag_after_er = False
+                    flag_before_er = False
+                    if child_[-1].i != sent.end and sent[child_[-1].i-sent.start + 1].pos_ != 'PUNCT':
+                        flag_after_er = True
+                        child_.append(sent[child_[-1].i-sent.start + 1])
+                    if child_[0].i != sent.start and child_[0].i != 0:
+                        if sent[child_[0].i-sent.start - 1].pos_ != 'PUNCT':
+                            flag_before_er = True
+                            child_.append(sent[child_[0].i-sent.start - 1])
+                    child_ = set(child_)
+                    if flag_after_er or flag_before_er:
+                        child_ = list(child_)
+                        child_.sort(key=lambda x: x.i)
+                        errs.append([find_span(child_), comment])
+                        return errs
+        return errs
 
     def redundant_comma(sent):
-
         error_clause = DependencyMatcher(vocab=nlp.vocab)
         wh_clause = [{'RIGHT_ID': 'root', 'RIGHT_ATTRS': {'DEP': {'IN': ['ROOT', 'ccomp']}}},
                      {'LEFT_ID': 'root', 'REL_OP': '>', 'RIGHT_ID': 'ccomp', 'RIGHT_ATTRS': {'DEP': 'ccomp'}},
                      {'LEFT_ID': 'ccomp', 'REL_OP': '>', 'RIGHT_ID': 'wrb',
                       'RIGHT_ATTRS': {'TAG': {'IN': ['WP', 'WRB']}}},
                      {'LEFT_ID': 'wrb', 'REL_OP': ';', 'RIGHT_ID': 'punct', 'RIGHT_ATTRS': {'POS': 'PUNCT'}}]
-
         whether_clause = [{'RIGHT_ID': 'root', 'RIGHT_ATTRS': {'DEP': {'IN': ['ROOT', 'ccomp']}}},
                           {'LEFT_ID': 'root', 'REL_OP': '>', 'RIGHT_ID': 'ccomp', 'RIGHT_ATTRS': {'DEP': 'ccomp'}},
                           {'LEFT_ID': 'ccomp', 'REL_OP': '>', 'RIGHT_ID': 'whether',
                            'RIGHT_ATTRS': {'DEP': 'mark', 'LEMMA': {'IN': ['whether', 'if']}}},
                           {'LEFT_ID': 'whether', 'REL_OP': ';', 'RIGHT_ID': 'punct', 'RIGHT_ATTRS': {'POS': 'PUNCT'}}]
-
         error_clause.add('wh_clause', [wh_clause, whether_clause])
         errors = []
         first = True
@@ -495,18 +629,17 @@ def models(text, test_mode=False):# ["pp_time"]
             if first:
                 if 'subj' not in sent[match[1][-2]].dep_:
                     first = False
-
                     errors.append([find_span([sent[match[1][-1]], sent[match[1][-2]]]),
                                    'You may have used a redundant comma in front of this conjunction.'])
         return errors
 
     def past_cont(sent):
         p_cont = [{'RIGHT_ID': 'vbg', 'RIGHT_ATTRS': {'TAG': 'VBG'}},
-                  {'LEFT_ID': 'vbg', 'REL_OP': '>', 'RIGHT_ID': 'was', 'RIGHT_ATTRS': {'DEP': 'aux', 'TAG': 'VBD', 'ORTH': {'IN': ['was', 'were']}}}]
+                  {'LEFT_ID': 'vbg', 'REL_OP': '>', 'RIGHT_ID': 'was',
+                   'RIGHT_ATTRS': {'DEP': 'aux', 'TAG': 'VBD', 'ORTH': {'IN': ['was', 'were']}}}]
         error_clause = DependencyMatcher(vocab=nlp.vocab)
         error_clause.add('p_cont', [p_cont])
         for match in error_clause(sent):
-
             verb = sent[match[1][0]]
             errors = []
             if without_child(verb, {'dep_': 'advmod', 'tag_': 'RB'}):
@@ -517,15 +650,12 @@ def models(text, test_mode=False):# ["pp_time"]
                     if any([while_.dep_ == 'mark'
                             and while_.lemma_ in {'as', 'while'} for while_ \
                             in advcl.children]): while_ = True;break;
-                # TODO always/never/forever/constantly/permanently/eternally  | for ever
-                # Исключения: every ..
+                if re.search(r'(always|never|forever|constantly|permanently|eternally|ever)', sent.text):
+                    return errors
                 if not while_ or errors:
-
                     errors.append([find_span([sent[match[1][1]], sent[match[1][0]]]),
                                    'The usage of Past Continuous might be erroneous.'])
-
             return errors
-
         return
 
     def consider_that(sent):
@@ -539,14 +669,300 @@ def models(text, test_mode=False):# ["pp_time"]
         return consider_that_errs
 
     def agreement_s_v(sent):
-        pass
+        errors_ = []
+        ambiguous = {'bison', 'cod', 'deer', 'fish', 'moose', 'boar', 'salmon', 'sheep',
+                     'shrimp', 'swine', 'trout', 'buffalo', 'grouse', 'elk', 'fruit', 'reindeer',
+                     'offspring', 'pike',
+                     'statistics', 'politics', 'mechanics', 'economics',
+                     'government', 'data', 'police', 'team', 'jury', 'family',
+                     'half', 'class', 'majority', 'part', 'percent', '%', 'cent', 'lot'}
+
+        sing_only = {'each', 'either', 'neither', 'one', 'nobody',
+                     'nothing', 'anyone', 'anybody', 'anything', 'someone',
+                     'somebody', 'something', 'everyone', 'everybody', 'everything',
+                     'this', 'one', 'other', 'measles'}
+
+        plur_only = {'several', 'few', 'many', 'both', 'these', 'those'}
+
+        def find_subj(pred):
+            # print(pred, [child.text for child in pred.lefts]) use pred.lefts to find quotes
+            # simple cases
+            subjects = []
+            subjects = [child for child in list(pred.children) if child.dep_.startswith(('nsubj', 'csubj'))]
+
+            # handling 'there is' and 'there are' cases
+            if pred.lemma_ == 'be' and 'there' in list(i.text.lower() for i in pred.children):
+                subjects += [child for child in list(pred.children) if child.dep_ == 'attr']
+
+            # if predicate is an auxiliary, we want to take subjects of its head
+            if pred.dep_.startswith('aux'):
+                subjects += [child for child in list(pred.head.children) if child.dep_.startswith(('nsubj', 'csubj'))]
+
+            # handling conjuncts: multiple subjects as in 'Mother and father are key figures in a child's life'.
+            add_subj = []
+            for subject in subjects:
+                add_subj += list(subject.conjuncts)
+
+            cur_pred = pred
+            while len(subjects) == 0 and cur_pred.dep_ == "conj":
+                cur_pred = cur_pred.head
+                subjects = find_subj(cur_pred)
+
+            subjects += add_subj
+
+            # the subjects' order may be different from sentence order, so we arrange it right
+            subjects.sort(key=lambda subj: subj.i)
+
+            return subjects
+
+        def find_pred_subj(doc):
+            pred_sub = list()
+            for token in doc:
+                if token.pos_ in ['AUX', 'VERB']:
+                    # negation: cases like "He doesn't scare me"
+                    aux = None
+                    if [ch for ch in list(token.lefts) if ch.dep_ == 'neg']:
+                        children = list(token.children)
+                        for ch in children:
+                            if ch.dep_ == 'aux' and not aux:
+                                aux = ch
+                        if aux:
+                            pred_sub += [(aux, find_subj(aux))]
+
+                    # if the predicate is analytical like 'I have done',
+                    # spacy rightfully considers the participle to be the root,
+                    # but we need grammatical info, so we will consider aux the root
+                    if not aux:  # for when negation is expressed with 'never' etc and does not need aux support
+                        if token.tag_ in ['VBN', 'VBG']:
+                            aux = None
+                            children = list(token.children)
+                            for ch in children:
+                                if ch.dep_ == 'aux' and ch.pos_ in ['VERB', 'AUX'] and ch.tag_ != 'VBN':
+                                    aux = ch
+                                elif not aux and ch.dep_ == 'auxpass' and ch.pos_ in ['VERB', 'AUX']:
+                                    aux = ch
+                            if aux:
+                                pred_sub += [(aux, find_subj(aux))]
+
+                        # all other cases
+                        elif token.dep_ in ['ROOT', 'ccomp', 'xcomp', 'acl', 'relcl']:
+                            pred_sub += [(token, find_subj(token))]
+
+                        # conjuncts: when there are multiple predicates connected by conjunction
+                        elif token.dep_ == 'conj' and token.head.dep_ in ['ROOT', 'ccomp', 'xcomp', 'acl', 'relcl']:
+                            pred_sub += [(token, find_subj(token))]
+
+            return pred_sub
+
+        def errors(ps):
+            res = []
+            for pair in ps:
+                subj_agr, pred_agr = None, None  # what each must agree with, variables must coincide in the end
+                pred = pair[0]
+                subj = pair[1]
+                if len(subj) == 1:
+                    subject = subj[0]
+                    s = subject.text.lower()
+                    subject_left_children = subject.lefts
+                    subject_is_numeral = False
+                    for child in subject_left_children:
+                        if child.pos_ == 'NUM':
+                            subject_is_numeral = True
+                            break
+                    if subject_is_numeral:
+                        continue
+                    if s not in ambiguous:
+                        children = list(ch for ch in subject.children)
+                        children_text = list(ch.text.lower() for ch in children)
+
+                        # singular only pronouns
+                        if s in sing_only or subject.ent_type_ == 'ORG':
+                            subj_agr = 'sg'
+                        elif subject.tag_ == 'VB':
+                            subj_agr = 'sg'
+
+                        # either singular or plural pronouns
+                        # if they have an 'of N, N, N...', after them we will require check if verb agrees with the last noun
+                        elif (s in {'some', 'any', 'none', 'all', 'most'} \
+                              and 'of' in children_text):
+                            of = [ch for ch in children if ch.text.lower() == 'of'][0]
+                            noun = [ch for ch in of.children if ch.pos_ == 'NOUN']
+                            if noun:
+                                noun = noun[0]
+                                while [ch for ch in noun.children if (ch.dep_ == 'conj' and ch.pos_ == 'NOUN')]:
+                                    noun = [ch for ch in noun.children if (ch.dep_ == 'conj' and ch.pos_ == 'NOUN')][-1]
+                                if noun.tag_ in ['NNS', 'NNPS'] or noun.text.lower() in plur_only:
+                                    subj_agr = 'pl'
+                                elif noun.tag_ in ['NN', 'NNP'] or noun.text.lower() in sing_only:
+                                    subj_agr = 'sg'
+
+                        # plural only pronouns
+                        elif s in plur_only and not children:
+                            subj_agr = 'pl'
+
+                        elif s in {'i', 'we', 'you', 'they'}:
+                            subj_agr = 'pl'
+                        elif s in {'he', 'she', 'it'}:
+                            subj_agr = 'sg'
+
+                        elif s == 'number':
+                            if 'a' in children_text and 'of' in children_text:
+                                subj_agr = 'pl'
+                            else:
+                                subj_agr = 'sg'
+
+                        # predicates in non-head clauses with 'who', 'that' agree with noun in head clause
+                        elif s in ['who', 'that', 'which']:
+                            if pred.dep_ == 'relcl':
+                                # why relcl? we can only be sure about this tag that it is the case we're looking for.
+                                # other possible predicate tags include '...comp', but these also apply
+                                # in cases like "I asked the boys who was the winner",
+                                # which, although with incorrect word order,
+                                # are still clearly present in Russian essays
+                                # and will be parsed by spacy as 'ccomp'
+                                head = pred.head
+                                if not head.conjuncts:
+                                    if head.tag_ in ['NNS', 'NNPS'] or head.text.lower() in plur_only:
+                                        subj_agr = 'pl'
+                                    elif head.tag_ in ['NN', 'NNP'] or head.text.lower() in sing_only:
+                                        subj_agr = 'sg'
+                                else:
+                                    conjuncts = list(head.conjuncts) + [head]
+                                    for conjunct in conjuncts:
+                                        if 'and' in list(child.text.lower() for child in conjunct.children):
+                                            subj_agr = 'pl'
+                        elif subject.tag_ in ['NNS', 'NNPS']:
+                            subj_agr = 'pl'
+                        elif subject.tag_ in ['NN', 'NNP', 'VBG']:
+                            subj_agr = 'sg'
+                        if subject.ent_type_ == 'LOC' or subject.ent_type_ == 'GPE':
+                            if subject.tag_ in ['NNS', 'NNPS']:
+                                continue
+                            else:
+                                subj_arg = 'sg'
+
+                elif len(subj) > 1:
+                    # 'Mother, father and brother were present.'
+                    # If conjuncts are connected by 'and', he predicate is plural
+                    # Exception: 'Every man, woman and child aprticipates in the tournament.'
+                    if 'and' in list(
+                            child.text.lower() for child in list(list(subj[0].children) + list(subj[-2].children))):
+                        left_subj_children = list(child.text.lower() for child in list(subj[0].lefts))
+                        left_pred_children = list(child.text.lower() for child in list(pred.lefts))
+                        is_uppercase = True
+                        all_gerund = True
+                        for sub in subj:
+                            if sub.tag_ != 'NNP':
+                                is_uppercase = False
+                                break
+                            if sub.tag_ != 'VBG':
+                                all_gerund = False
+                        # Don't check: 'Playing football and enjoying it + is a good thing | are different things)'
+                        if all_gerund:
+                            continue
+                        # Don't check: 'Jones and Sons is a respectable company.'
+                        if is_uppercase:
+                            continue
+                        # Don't check: 'There is Tom and Mary as a perfect example.'
+                        if pred.text.lower() in ['is', 'are'] and 'there' in left_pred_children:
+                            continue
+                        if 'every' in left_subj_children or 'each' in left_subj_children:
+                            subj_agr = 'sg'
+                        else:
+                            subj_agr = 'pl'
+                    # 'Mother, father or brother comes to pick up the kid.'
+                    # If conjuncts are connected by 'or', verb agrees with the last one
+                    elif any(a in list(
+                            child.text.lower() for child in list(list(subj[0].children) + list(subj[-2].children))) for
+                             a in ['or', 'nor']):
+                        if subj[-1].tag_ in ['NNS', 'NNPS'] or subj[-1].text.lower() in plur_only:
+                            subj_agr = 'pl'
+                        elif subj[-1].tag_ in ['NN', 'NNP', 'VBG'] or subj[-1].text.lower() in sing_only:
+                            subj_agr = 'sg'
+
+                if pred.tag_ == 'VBZ':
+                    pred_agr = 'sg'
+                elif pred.tag_ == 'VBP':
+                    pred_agr = 'pl'
+                elif pred.lemma == 'be':
+                    if pred.text == 'was':
+                        pred_agr = 'sg'
+                    elif pred.text == 'were':
+                        pred_agr = 'pl'
+
+                if subj_agr != pred_agr and subj_agr and pred_agr:
+                    res += [pair]
+
+            return res
+        ps = find_pred_subj(sent)
+        er = errors(ps)
+        for e in er:
+            er_span = []
+            for part in e:
+                if isinstance(part, list):
+                    er_span.extend(part)
+                else:
+                    er_span.append(part)
+
+            errors_.append([find_span(er_span),
+                           'It seems that the subject and predicate are not in agreement.'])
+        return errors_
+
+    def gerund(sent):
+        errs = []
+        with open('gerund_errors.txt', 'r') as fw:
+            words = fw.read()
+        gerund = words.split('\n')
+        for word in gerund:
+            matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
+            matcher.add("gerund", [nlp(word)])
+            matches = matcher(sent)
+            if matches:
+                for m in matches:
+                    child_ = [of for of in sent[m[-2] - sent.start].children if of.dep_ == 'prep' and of.lemma_ == 'of']
+                    if child_:
+                        child_.append(sent[m[-2] - sent.start])
+                        errs.append([find_span(child_),
+                                        'This gerund needs direct object.'])
+                        return errs
+        return errs
 
     def prep(sent):
-        pass
+        errs = []
+        with open('noun_preps.json') as f:
+            d = json.load(f)
+        for noun in d.keys():
+            matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
+            matcher.add("noun", [nlp(noun)])
+            matches = matcher(sent)
+            for m in matches:
+                child_ = [of for of in sent[m[-2] - sent.start].children if of.dep_ == 'prep']
+                if str(sent[m[-2] - sent.start].lemma_) in d.keys():
+                    child_ = [prep_ for prep_ in child_ if prep_.text not in d[str(sent[m[-2] - sent.start].lemma_)]]
+                    if child_:
+                        child_.append(sent[m[-2] - sent.start])
+                        errs.append([find_span(child_),
+                                     "This noun is frequently used with a different preposition. Check out possible combinations at http://realec-reference.site/articlesByTag/Prepositions"])
+                        return errs
+        return errs
 
     def adj(sent):
-        pass
-
+        errs = []
+        with open('adj_preps.json') as f:
+            d = json.load(f)
+        for adj in d.keys():
+            matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
+            matcher.add("noun", [nlp(adj)])
+            matches = matcher(sent)
+            for m in matches:
+                child_ = [of for of in sent[m[-2] - sent.start].children if of.dep_ == 'prep']
+                if str(sent[m[-2] - sent.start].lemma_) in d.keys():
+                    child_ = [prep_ for prep_ in child_ if prep_.text not in d[str(sent[m[-2] - sent.start].lemma_)]]
+                    if child_:
+                        child_.append(sent[m[-2] - sent.start])
+                        errs.append([find_span(child_),
+                                     "You might want to use a different preposition with this adjective."])
+        return errs
     def quantifiers(sent):
         # you may specify your own list of uncountable nouns here
         unc_list0 = []
@@ -568,7 +984,6 @@ def models(text, test_mode=False):# ["pp_time"]
         uncount_count_pl = ['enough']
         uncount_count_pl_of = ['lot', 'lots', 'none', 'bags', \
                                'heaps', 'loads', 'oodles', 'stacks']
-
         quantifiers = uncount + count_pl + uncount_count_sg + uncount_count_pl
         quantifiers_of = uncount_of + count_pl_of + uncount_count_pl_of
         for i in sent:
@@ -637,9 +1052,9 @@ def models(text, test_mode=False):# ["pp_time"]
                 if re.match(r'hundreds|thousands|millions|billions|zillions', i.head.text.lower()):
                     erroneous.append([find_span([i, i.head]), 'numerals'])
         return erroneous
+
     def polarity(sentence):
         # Checks if any polarity items were used in the wrong context
-
         neg_error_message = 'This item can only be used in negative contexts.'
         pos_error_message = 'This item can only be used in positive contexts.'
         polarity_errors = []
@@ -654,7 +1069,6 @@ def models(text, test_mode=False):# ["pp_time"]
         temporal_neg_exp = r'in (?:hours|days|weeks(?! [0-9])|months(?! [JFMASOD])|years(?! gone| past| [a-zA-Z]*? ?[0-9])|decades|yonks|eons|a million years|ages(?! [0-9])|donkey\'s years)'
         neg_pol = re.compile('|'.join([neg_gr, neg_exp, temporal_neg_exp]))
         pos_pol = re.compile(r'already|somewhat|too')
-
         words = ' '.join([token.text for token in sentence])
         # When there is a negative polarity item but no prior negation
         neg = re.search(neg_pol, words)
@@ -681,7 +1095,6 @@ def models(text, test_mode=False):# ["pp_time"]
                                             neg_error_message])  # if more than one word in polarity item, only finds the first one
 
         # todo add superlative licensing for temporal PI
-
         # When there is a positive polarity item but it is negated
         pos = re.search(pos_pol, words)
         if pos:
@@ -701,9 +1114,7 @@ def models(text, test_mode=False):# ["pp_time"]
                         licensed = True  # Not licensed per se, but rather not a PPI at all
                 if not licensed:
                     polarity_errors.append([find_span([pos_token]), pos_error_message])
-
         # Checking if negation's parent is an ancestor of a PPI yields too many false positives
-
         return polarity_errors
 
     def preprocess(sentences):
@@ -712,7 +1123,13 @@ def models(text, test_mode=False):# ["pp_time"]
         sentence_dots = re.sub(r'\.\s\.', '..', sentence_dots)
         sentence_dots = re.sub(r'\!', '! ', sentence_dots)
         sentence_dots = re.sub(r'\?', '? ', sentence_dots)
+        sentence_dots = re.sub(r'\(', ' (', sentence_dots)
+        sentence_dots = re.sub(r'\)', ') ', sentence_dots)
+        sentence_dots = re.sub(r'\) \.', ').', sentence_dots)
+        sentence_dots = re.sub(r' ,', ',', sentence_dots)
+        sentence_dots = re.sub(r'\n', ':::', sentence_dots)
         sentence_dots = re.sub(r'\s\s', ' ', sentence_dots)
+        sentence_dots = re.sub(r':::', '\n', sentence_dots)
         return sentence_dots
 
     def apply_models(sentence_process, test_mode):
@@ -721,20 +1138,17 @@ def models(text, test_mode=False):# ["pp_time"]
             for sent in sentence_process.sents:
                 for function in test_mode:
                     exec(f'result.append({function}(sent))')
-
-
         else:
             observed_functions = {quantifiers, past_cont, redundant_comma, hardly, that_comma, pp_time,
                                   only, inversion, extra_inversion, spelling, conditionals,
-                                  consider_that, polarity}
-
+                                  consider_that, polarity, punct,
+                                  agreement_s_v, gerund, prep, adj}
             apply_ = lambda f, given_: f(given_)
             for function in observed_functions:
                 sentence_err = apply_(function, sentence_process)
                 if sentence_err:
                     result.extend(sentence_err)
         return result
-
     text_ = preprocess(text)
     doc = nlp(text_)
     if test_mode:
@@ -747,20 +1161,15 @@ def models(text, test_mode=False):# ["pp_time"]
                 all_errors[num] = [errors]
             else:
                 all_errors[num] = errors
-
     return text_, all_errors
-
-
 def generate_text(text):
     text_, errors = models(text)
     annotated_text, comments = output_maker(text_, errors)
     return annotated_text, comments
-
-
 # nlp = spacy.load("en_core_web_sm")
-# text_ = 'The number of cheese in my fridge is large.'
+# text_ = """It's no secret that there has been a decline in the use of transport such as taxis ever since cars became more affordable and your common Joe became capable of sustaining one, two or more per family, however, does that really mean that the future of public transport like buses is hopeless?"""
 # doc_ = nlp(text_)
 # for d in doc_.sents:
 #     for t in d:
 #         print(t, t.head, t.dep_, t.tag_, t.pos_)
-# print(models(text_, test_mode=["quantifiers"]))
+# print(models(text_, test_mode=["pp_time"]))

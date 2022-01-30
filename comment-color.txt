@@ -23,5 +23,9 @@ In if-clauses talking about unreal,#FFF633,1
 You may have used a redundant comma in front of,#DC143C,2
 The usage of Past Continuous might be erroneous,#FFF633,1
 You may have wrongly used the verb CONSIDER with THAT,#98fb98,3
+This noun is frequently used with a different preposition,#98fb98,3
+You might want to use a different preposition with this adjective,#98fb98,3
+This gerund needs direct object,#98fb98,3
+It seems that the subject and predicate are not in agreement,#FFF633,1
 That might be an erroneous use of quantifiers,#ff8c00,1
 This item can only be used in,#DC143C,1
