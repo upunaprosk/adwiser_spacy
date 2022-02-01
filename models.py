@@ -9,11 +9,12 @@ from spacy.matcher import DependencyMatcher
 from spacy.matcher import Matcher
 from spellchecker import SpellChecker
 from spacy.matcher import PhraseMatcher
-import json
+
 nlp = spacy.load("en_core_web_sm")
 # tagger = treetaggerwrapper.TreeTagger(TAGLANG='en', TAGDIR='tt/')
 char_span = lambda token: (token.idx, token.idx + len(token.text))
 Token.set_extension(name='span', getter=char_span)
+
 
 #
 # def tree_tag_(token):
@@ -197,9 +198,10 @@ def models(text, test_mode=False):  # ["pp_time"]
             elif token_i.lemma_ == 'little' and token_i.dep_ in {'npadvmod', 'dobj', 'advmod'}:
                 if without_child(token_i, {'lemma_': 'by'}):
                     return True
-            elif token_i.lemma_ == 'not' and token_i.dep_ == 'preconj' and token.sent[token.i + 1].pos_ not in ['NOUN', 'PRON']:
-                flag = [i for i in token_i.children if i.lemma_ in {'only', 'since'}]
-                if flag:
+            elif token_i.lemma_ == 'not' and token_i.dep_ == 'preconj' and token.sent[token.i + 1].pos_ not in ['NOUN',
+                                                                                                                'PRON']:
+                flag_ = [i for i in token_i.children if i.lemma_ in {'only', 'since'}]
+                if flag_:
                     return True
 
             return False
@@ -210,7 +212,7 @@ def models(text, test_mode=False):  # ["pp_time"]
                 prep_no_noun = [{'RIGHT_ID': 'prep',
                                  'RIGHT_ATTRS': {'LEMMA': {'IN': ['under', 'in', 'over', 'at', 'for', 'to']},
                                                  'TAG': 'IN'}},
-                                {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun', 'RIGHT_ID': 'noun',
+                                {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun',
                                  'RIGHT_ATTRS': {'POS': 'NOUN'}},
                                 {'LEFT_ID': 'noun', 'REL_OP': '>', 'RIGHT_ID': 'no', 'RIGHT_ATTRS': {'LEMMA': 'no'}}]
                 no_sooner = [{'RIGHT_ID': 'no', 'RIGHT_ATTRS': {'LEMMA': 'no', 'DEP': 'neg'}},
@@ -255,7 +257,6 @@ def models(text, test_mode=False):  # ["pp_time"]
                                         noun.dep_ in {'nsubj', 'nsubjpass'}]
 
                         if noun:
-
                             wrong_order = True if verb.i > noun[0].i else False
                             if wrong_order:
                                 errors = []
@@ -298,7 +299,7 @@ def models(text, test_mode=False):  # ["pp_time"]
                 prep_no_noun = [{'RIGHT_ID': 'prep',
                                  'RIGHT_ATTRS': {'LEMMA': {'IN': ['under', 'in', 'over', 'at', 'for', 'to']},
                                                  'TAG': 'IN'}},
-                                {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun', 'RIGHT_ID': 'noun',
+                                {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun',
                                  'RIGHT_ATTRS': {'POS': 'NOUN'}},
                                 {'LEFT_ID': 'noun', 'REL_OP': '>', 'RIGHT_ID': 'no', 'RIGHT_ATTRS': {'LEMMA': 'no'}}]
                 no_sooner = [{'RIGHT_ID': 'no', 'RIGHT_ATTRS': {'LEMMA': 'no', 'DEP': 'neg'}},
@@ -533,81 +534,74 @@ def models(text, test_mode=False):  # ["pp_time"]
 
     def punct(sent):
         comment = """A comma seems to be missing."""
-        to = [{'RIGHT_ID': 'to', 'RIGHT_ATTRS': {'LEMMA': 'to', 'DEP': 'aux'}},
-              {'LEFT_ID': 'to', 'REL_OP': '<', 'RIGHT_ID': 'advcl', 'RIGHT_ATTRS':
-                  {'POS': {'IN': ['AUX', 'VERB']}, 'DEP': 'advcl'}}]
-        preps = [{'RIGHT_ID': 'prep', 'RIGHT_ATTRS': {'LEMMA': {'IN': ['in', 'on', 'for', 'from']}, 'DEP': 'prep'}},
-                 {'LEFT_ID': 'prep', 'REL_OP': '>', 'RIGHT_ID': 'noun', 'RIGHT_ATTRS':
-                     {'POS': 'NOUN', 'LEMMA': {'IN': ['view','viewpoint','perspective','point','instance','example','conclusion','word', 'contrary']}}}]
-
-        all_nouns = []
-        pattern_ = """In conclusion|However|Nevertheless|Consequently||Firstly|Secondly|Thirdly|Moreover|In short|Surprisingly|Unsurprisingly|Hopefully|Interestingly|Obviously| \
-        Thus|Of course|Unexpectedly|Sadly|Luckily|Fortunately|Thankfully|Certainly|Definitely|Doubtless\
-        Finally|Never the less|Honestly|Furthermore|Typically|On one hand|On the other hand"""
-        dep_matcher = DependencyMatcher(vocab=nlp.vocab)
-        dep_matcher.add("to", patterns=[to])
-        dep_matcher.add("prep_phrase", patterns=[preps])
         errs = []
-        for matched in dep_matcher(sent):
-            first_w = sent[matched[-1][0]].i == sent.start
-            if nlp.vocab[matched[0]].text == 'to' and sent[matched[-1][0]].i != sent.start:
-                break
-            last_word = sent[matched[-1][-1]]
-            child_ = [i for i in last_word.children]
-            child_.append(last_word)
-            if sent[child_[-1].i - sent.start + 1].pos_ == 'PUNCT':
-                if first_w:
-                    continue
-                if sent[child_[-1].i - sent.start - 1].pos_ == 'PUNCT':
-                    continue
-            the_ = [i for i in child_ if i.lemma_ == 'the']
-            flag_wrong = [i for i in child_ if i.dep_ == 'ROOT']
-            if flag_wrong:
-                continue
-            child_extra = []
-            if nlp.vocab[matched[0]].text != 'to':
-                [child_extra.extend(i.children) for i in child_]
-                child_.extend(child_extra)
-            if the_:
-                child_.append(the_[0].head)
-            child_.append(sent[matched[-1][0]])
-            child_.sort(key=lambda x: x.i)
-            flag_after_er = False
-            flag_before_er = False
-            if sent[child_[-1].i-sent.start].pos_ != 'PUNCT' and sent[child_[-1].i-sent.start + 1].pos_ != 'PUNCT' and sent[child_[-1].i-sent.start + 2].pos_ != 'PUNCT':
-                flag_after_er = True
-            if child_[0].i != sent.start and child_[0].i !=0:
-                if sent[child_[0].i-sent.start - 1].pos_ != 'PUNCT':
-                    flag_before_er = True
-            if flag_after_er or flag_before_er:
-                errs.append([find_span(child_),
-                           comment])
-                return errs
-        for p in pattern_.split('|'):
-            matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
-            matcher.add("intro_phrase", [nlp(p)])
-            matches = matcher(sent)
-            if matches:
-                for m in matches:
-                    if sent[m[1]-sent.start].i != sent.start: continue;
-                    child_ = []
-                    [child_.append(sent[x]) for x in range(m[-2]-sent.start, m[-1]-sent.start)]
-                    child_.sort(key=lambda x: x.i)
-                    flag_after_er = False
-                    flag_before_er = False
-                    if child_[-1].i != sent.end and sent[child_[-1].i-sent.start + 1].pos_ != 'PUNCT':
-                        flag_after_er = True
-                        child_.append(sent[child_[-1].i-sent.start + 1])
-                    if child_[0].i != sent.start and child_[0].i != 0:
-                        if sent[child_[0].i-sent.start - 1].pos_ != 'PUNCT':
-                            flag_before_er = True
-                            child_.append(sent[child_[0].i-sent.start - 1])
-                    child_ = set(child_)
-                    if flag_after_er or flag_before_er:
-                        child_ = list(child_)
-                        child_.sort(key=lambda x: x.i)
-                        errs.append([find_span(child_), comment])
-                        return errs
+        re_find_b = [r"(From [a-z].? (?:point of view|viewpoint|perspective))",
+                     r"(From [A-Z][a-z]+'s (?:point of view|viewpoint|perspective))",
+                     r'(To [a-z]{2,5} mind)', r'For (?:example|instance)', r'(However|Nevertheless|Consequently|To start with|Firstly| \
+        Secondly|Thirdly|Moreover|On the other hand|In other words|In short|Surprisingly| \
+        Unsurprisingly|Hopefully|Interestingly|Obviously|In conclusion|To conclude|To sum up| \
+        Thus|Of course)']
+
+        re_check_b = [r'From [a-z]{2,5} (?:point of view|viewpoint|perspective), ',
+                      r"From [A-Z][a-z]+'s (?:point of view|viewpoint|perspective), ",
+                      r'To [a-z]{2,5} mind, ', r'For (?:example|instance), ', r'(?:However|Nevertheless|Consequently|To start with|Firstly| \
+        Secondly|Thirdly|Moreover|On the other hand|In other words|In short|Surprisingly| \
+        Unsurprisingly|Hopefully|Interestingly|Obviously|In conclusion|To conclude|To sum up| \
+        Thus|Of course), ']
+
+        re_find_m = [r"(from [a-z]{2,5} (?:point of view|viewpoint|perspective))",
+                     r'(to [a-z]{2,5} mind)',
+                     r'(for (?:example|instance))',
+                     r'(however|nevertheless|consequently|to start with|firstly|secondly|thirdly|moreover|on the other hand|in other words|in short|surprisingly|\
+        unsurprisingly|hopefully|interestingly|obviously|in conclusion|to conclude|to sum up|thus|of course)']
+        re_check_m = [r'.*, from [a-z]{2,5} (?:point of view|viewpoint|perspective), ', r'.*, to [a-z]{2,5} mind, ',
+                      r'.*, for (?:example|instance), ',
+                      r'(?:however|nevertheless|consequently|to start with|firstly|secondly|thirdly|moreover|on the other hand|in other words|in short|surprisingly|unsurprisingly|hopefully|interestingly|obviously|in conclusion|to conclude|to sum up|thus|of course), ']
+        re_trigger1 = [r'.* (?:вЂ”|-|:) from [a-z]{2,5} (?:point of view|viewpoint|perspective), ',
+                       r'.* (?:вЂ”|-|:) to [a-z]{2,5} mind, ',
+                       r'.* (?:вЂ”|-|:) for (?:example|instance), ', r'.* (?:вЂ”|-|:) (?:however|nevertheless|consequently|to start with|firstly| \
+        secondly|thirdly|moreover|on the other hand|in other words|in short|surprisingly| \
+        unsurprisingly|hopefully|interestingly|obviously|in conclusion|to conclude|to sum up| \
+        thus|of course), ']
+        re_trigger2 = [r'.*, from [a-z]{2,5} (?:point of view|viewpoint|perspective) (?:вЂ”|-|:|.)',
+                       r'.*, to [a-z]{2,5} mind (?:вЂ”|-|:|.) (?:вЂ”|-|:|.)',
+                       r'.*, for (?:example|instance) (?:вЂ”|-|:|.)', r'.*, (?:however|nevertheless|consequently|to start with|firstly| \
+        secondly|thirdly|moreover|on the other hand|in other words|in short|surprisingly| \
+        unsurprisingly|hopefully|interestingly|obviously|in conclusion|to conclude|to sum up| \
+        thus|of course) (?:вЂ”|-|:|.)']
+
+        for pattern in re_find_b:
+            if re.search(pattern, sent.text):
+                found = 0
+                for true_pattern in re_check_b:
+                    if re.search(true_pattern, sent.text):
+                        found = 1
+                        break
+                if found == 0:
+                    m = re.search(pattern, sent.text).span()
+                    start, end = m
+                    errs.append([[sent.start + start, sent.start + end], comment])
+
+        for pattern in re_find_m:
+            if re.search(pattern, sent.text):
+                found = 0
+                for true_pattern in re_check_m:
+                    if re.search(true_pattern, sent.text):
+                        found = 1
+                        break
+                for also_true_pattern in re_trigger1:
+                    if re.search(also_true_pattern, sent.text):
+                        found = 1
+                        break
+                for also_true_pattern in re_trigger2:
+                    if re.search(also_true_pattern, sent.text):
+                        found = 1
+                        break
+                if found == 0:
+                    m = re.search(pattern, sent.text).span()
+                    start, end = m
+                    errs.append([[sent.start + start, sent.start + end], comment])
+
         return errs
 
     def redundant_comma(sent):
@@ -630,7 +624,7 @@ def models(text, test_mode=False):  # ["pp_time"]
                 if 'subj' not in sent[match[1][-2]].dep_:
                     first = False
                     errors.append([find_span([sent[match[1][-1]], sent[match[1][-2]]]),
-                                   'You may have used a redundant comma in front of this conjunction.'])
+                                   'You may have used a redundant punctuation mark in front of this conjunction.'])
         return errors
 
     def past_cont(sent):
@@ -783,7 +777,7 @@ def models(text, test_mode=False):  # ["pp_time"]
 
                         # either singular or plural pronouns
                         # if they have an 'of N, N, N...', after them we will require check if verb agrees with the last noun
-                        elif (s in {'some', 'any', 'none', 'all', 'most'} \
+                        elif (s in {'some', 'any', 'none', 'all', 'most'}
                               and 'of' in children_text):
                             of = [ch for ch in children if ch.text.lower() == 'of'][0]
                             noun = [ch for ch in of.children if ch.pos_ == 'NOUN']
@@ -894,6 +888,7 @@ def models(text, test_mode=False):  # ["pp_time"]
                     res += [pair]
 
             return res
+
         ps = find_pred_subj(sent)
         er = errors(ps)
         for e in er:
@@ -905,15 +900,18 @@ def models(text, test_mode=False):  # ["pp_time"]
                     er_span.append(part)
 
             errors_.append([find_span(er_span),
-                           'It seems that the subject and predicate are not in agreement.'])
+                            'It seems that the subject and predicate are not in agreement.'])
         return errors_
 
     def gerund(sent):
+
         errs = []
+        if not re.search('of', sent.text): return errs
         with open('gerund_errors.txt', 'r') as fw:
             words = fw.read()
         gerund = words.split('\n')
         for word in gerund:
+            if not re.search(word, sent.text, flags=re.I): continue
             matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
             matcher.add("gerund", [nlp(word)])
             matches = matcher(sent)
@@ -923,46 +921,71 @@ def models(text, test_mode=False):  # ["pp_time"]
                     if child_:
                         child_.append(sent[m[-2] - sent.start])
                         errs.append([find_span(child_),
-                                        'This gerund needs direct object.'])
+                                     'This gerund needs direct object.'])
                         return errs
         return errs
 
     def prep(sent):
         errs = []
-        with open('noun_preps.json') as f:
-            d = json.load(f)
-        for noun in d.keys():
+        with open("noun_prep.txt", 'r', encoding='utf-8') as file:
+            raw = file.read()
+            nounpreps = raw.split('\n')
+        nouns = []
+        for phrase in nounpreps:
+            words = phrase.split(" ")
+            noun = words[0]
+            if noun not in nouns:
+                nouns.append(noun)
+        for noun in nouns:
+            if not re.search(noun, sent.text, flags=re.I): continue
             matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
             matcher.add("noun", [nlp(noun)])
             matches = matcher(sent)
             for m in matches:
-                child_ = [of for of in sent[m[-2] - sent.start].children if of.dep_ == 'prep']
-                if str(sent[m[-2] - sent.start].lemma_) in d.keys():
-                    child_ = [prep_ for prep_ in child_ if prep_.text not in d[str(sent[m[-2] - sent.start].lemma_)]]
-                    if child_:
-                        child_.append(sent[m[-2] - sent.start])
-                        errs.append([find_span(child_),
-                                     "This noun is frequently used with a different preposition. Check out possible combinations at http://realec-reference.site/articlesByTag/Prepositions"])
-                        return errs
+                if sent[m[-2] - sent.start].pos_ != 'NOUN': continue
+                child_ = [of for of in sent[m[-2] - sent.start].children if
+                          of.dep_ == 'prep' and of.i > sent[m[-2] - sent.start].i and of.text != 'to']
+                child_ = [prep_ for prep_ in child_ if noun + ' ' + prep_.text in nounpreps]
+                if not child_:
+                    child_ = [prep_ for prep_ in child_ if noun + ' ' + prep_.text not in nounpreps]
+                    if not len(child_): continue
+                    child_.append(sent[m[-2] - sent.start])
+
+                    errs.append([find_span(child_),
+                                 "This noun is frequently used with a different preposition. \
+                                 Check out possible combinations at \
+                                 http://realec-reference.site/articlesByTag/Prepositions"])
+                    return errs
         return errs
 
     def adj(sent):
         errs = []
-        with open('adj_preps.json') as f:
-            d = json.load(f)
-        for adj in d.keys():
+        with open('adj.txt', 'r', encoding='utf-8') as file:
+            raw = file.read()
+            adj_phrase = raw.split('\n')
+        adjs = []
+        for phrase in adj_phrase:
+            words = phrase.split(' ')
+            adj = words[0]
+            if adj not in adjs:
+                adjs.append(adj)
+        for adj in adjs:
+            if not re.search(adj, sent.text, flags=re.I): continue
             matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
             matcher.add("noun", [nlp(adj)])
             matches = matcher(sent)
             for m in matches:
-                child_ = [of for of in sent[m[-2] - sent.start].children if of.dep_ == 'prep']
-                if str(sent[m[-2] - sent.start].lemma_) in d.keys():
-                    child_ = [prep_ for prep_ in child_ if prep_.text not in d[str(sent[m[-2] - sent.start].lemma_)]]
-                    if child_:
-                        child_.append(sent[m[-2] - sent.start])
-                        errs.append([find_span(child_),
-                                     "You might want to use a different preposition with this adjective."])
+                child_ = [of for of in sent[m[-2] - sent.start].children if of.dep_ == 'prep' \
+                          and of.i > sent[m[-2] - sent.start].i \
+                          and adj + ' ' + of.text in adj_phrase and of.lemma_ != 'to']
+                if child_:
+                    child_ = [prep_ for prep_ in child_ if adj + ' ' + prep_.text not in adj_phrase]
+                    if not len(child_): continue
+                    child_.append(sent[m[-2] - sent.start])
+                    errs.append([find_span(child_),
+                                 "You might want to use a different preposition with this adjective."])
         return errs
+
     def quantifiers(sent):
         # you may specify your own list of uncountable nouns here
         unc_list0 = []
@@ -982,7 +1005,7 @@ def models(text, test_mode=False):  # ["pp_time"]
         # needs uncountable words list to be checked
         # uncount_count_pl = ['enough'] #needs uncountable words list to be checked    uncount_count_pl_of = ['lot', 'lots', 'none', 'bags', 'heaps', 'loads', 'oodles', 'stacks']
         uncount_count_pl = ['enough']
-        uncount_count_pl_of = ['lot', 'lots', 'none', 'bags', \
+        uncount_count_pl_of = ['lot', 'lots', 'none', 'bags',
                                'heaps', 'loads', 'oodles', 'stacks']
         quantifiers = uncount + count_pl + uncount_count_sg + uncount_count_pl
         quantifiers_of = uncount_of + count_pl_of + uncount_count_pl_of
@@ -1121,7 +1144,7 @@ def models(text, test_mode=False):  # ["pp_time"]
         sentence_dots: str = re.sub(r'\.', '. ', sentences)
         sentence_dots = re.sub(r'\.\s\.\s\.', '...', sentence_dots)
         sentence_dots = re.sub(r'\.\s\.', '..', sentence_dots)
-        sentence_dots = re.sub(r'\!', '! ', sentence_dots)
+        sentence_dots = re.sub(r'!', '! ', sentence_dots)
         sentence_dots = re.sub(r'\?', '? ', sentence_dots)
         sentence_dots = re.sub(r'\(', ' (', sentence_dots)
         sentence_dots = re.sub(r'\)', ') ', sentence_dots)
@@ -1149,6 +1172,7 @@ def models(text, test_mode=False):  # ["pp_time"]
                 if sentence_err:
                     result.extend(sentence_err)
         return result
+
     text_ = preprocess(text)
     doc = nlp(text_)
     if test_mode:
@@ -1162,14 +1186,17 @@ def models(text, test_mode=False):  # ["pp_time"]
             else:
                 all_errors[num] = errors
     return text_, all_errors
+
+
 def generate_text(text):
     text_, errors = models(text)
     annotated_text, comments = output_maker(text_, errors)
     return annotated_text, comments
 # nlp = spacy.load("en_core_web_sm")
-# text_ = """It's no secret that there has been a decline in the use of transport such as taxis ever since cars became more affordable and your common Joe became capable of sustaining one, two or more per family, however, does that really mean that the future of public transport like buses is hopeless?"""
+# text_ = """For example it was wrong. I have been there yesterday."""
 # doc_ = nlp(text_)
 # for d in doc_.sents:
 #     for t in d:
 #         print(t, t.head, t.dep_, t.tag_, t.pos_)
-# print(models(text_, test_mode=["pp_time"]))
+# print(models(text_, test_mode=['punct']))
+# print(generate_text(text_))
