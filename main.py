@@ -1,8 +1,7 @@
 from flask import Flask, Markup, request, render_template
-from models import generate_text
+from scripts.models import generate_text
 
 app = Flask(__name__)
-
 
 @app.route('/')
 def index():
