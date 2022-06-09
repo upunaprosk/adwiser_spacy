@@ -1,7 +1,8 @@
 # Automated Detection of Writing Inaccuracies for Students of English in Russia
 
-Writing assistant for people writing in a language they are learning.  
-[**Website**](http://iproskurina.pythonanywhere.com)  
+Rule-based writing assistant created based on frequent learner errors occurring in Russian Error-Annotated Learner English Corpus.
+
+[Website](http://iproskurina.pythonanywhere.com)  
 
 Errors covered by the writing assistant rules:  
 1) Present Perfect misuse in sentences with a time indication of the past (_Sweden and USA had a similar figures, but the gap between them **has become larger** during the period between 2000 and 2010._);
